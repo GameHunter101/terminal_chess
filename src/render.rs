@@ -1,64 +1,80 @@
-use std::io::{self, stdout};
+use std::io::{self, stdout, Write};
 
-use crossterm::{cursor, execute, terminal};
+use crossterm::{cursor, execute, queue, terminal};
+
+use crate::terminal_management::EditorContents;
 
 pub struct Render {
-    content: EditorContents,
+    pub content: EditorContents,
     width: usize,
     height: usize,
+    cursor_controller: CursorController,
 }
 
 impl Render {
     pub fn new() -> Result<Self, RenderError> {
-        let (term_width, term_height) = crossterm::terminal::size().unwrap();
+        let (term_width, term_height) = terminal::size().unwrap();
         let width = term_width as usize;
-        let height = term_height as usize - 1;
+        let height = term_height as usize;
         if width < 10 && height < 10 {
             return Err(RenderError::TerminalSizeError(
                 "Terminal size is too small!",
             ));
         }
         Ok(Self {
-            content: " ".repeat(width * height).to_string(),
+            content: EditorContents::new(),
             width,
             height,
+            cursor_controller: CursorController::new(),
         })
     }
 
-    fn clear_screen(&self) -> crossterm::Result<()> {
+    pub fn clear_screen() -> crossterm::Result<()> {
         execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
         execute!(stdout(), cursor::MoveTo(0, 0))
     }
 
-    pub fn render(&self) -> io::Result<()> {
-        self.clear_screen();
-
-        for line in &self.content {
-            println!("{line}");
+    pub fn draw_rows(&mut self) {
+        for i in 0..self.height {
+            if i == self.height / 3 {
+                let mut welcome = format!("Pound Editor --- Version {}", 1.0);
+                if welcome.len() > self.width {
+                    welcome.truncate(self.width);
+                }
+                let mut padding = (self.width - welcome.len()) / 2;
+                if padding != 0 {
+                    self.content.push('~');
+                    padding -= 1;
+                }
+                (0..padding).for_each(|_| self.content.push(' '));
+                self.content.push_str(&welcome);
+            } else {
+                self.content.push('~');
+            }
+            queue!(
+                self.content,
+                terminal::Clear(terminal::ClearType::UntilNewLine)
+            )
+            .unwrap();
+            if i < self.height - 1 {
+                self.content.push_str("\r\n");
+            }
+            stdout().flush();
         }
-
-        Ok(())
     }
-}
 
-#[allow(dead_code)]
-#[derive(Clone, Copy)]
-pub enum InsertHorizontalPosition {
-    Exact(usize),
-    Center,
-    Right,
-}
-
-pub enum InsertVerticalPosition {
-    Exact(usize),
-    Center,
-    Bottom,
-}
-
-#[derive(Clone)]
-pub enum TextFormats {
-    SingleLine(&'static str),
-    MultiLine(Vec<&'static str>),
+    pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
+        queue!(self.content, cursor::Hide, cursor::MoveTo(0, 0))?;
+        self.draw_rows();
+        let cursor_x = self.cursor_controller.cursor_x;
+        let cursor_y = self.cursor_controller.cursor_y;
+        queue!(
+            self.content,
+            cursor::MoveTo(cursor_x as u16, cursor_y as u16),
+            cursor::Show
+        )?;
+        self.content.flush()
+    }
 }
 
 #[derive(Debug)]
@@ -79,147 +95,16 @@ impl std::error::Error for RenderError {
     }
 }
 
-struct EditorContents {
-    content: String,
-    width: usize,
-    height: usize,
+struct CursorController {
+    cursor_x: usize,
+    cursor_y: usize,
 }
 
-impl EditorContents {
-    fn new(width: usize, height: usize) -> Self {
-        EditorContents {
-            content: String::new(),
-            width,
-            height,
+impl CursorController {
+    pub fn new() -> Self {
+        Self {
+            cursor_x: 0,
+            cursor_y: 0,
         }
-    }
-
-    fn set_contents(&mut self, string: String) {
-        self.content = string;
-    }
-
-    pub fn add_text(
-        &mut self,
-        text: TextFormats,
-        horizontal_position: InsertHorizontalPosition,
-        vertical_position: InsertVerticalPosition,
-        line_seperation: usize,
-    ) -> Result<(), RenderError> {
-        let split_content = self.split_contents(self.content, self.width);
-
-        let start_vertical_position =
-            self.vertical_text_position(&text, vertical_position, line_seperation)?;
-        match &text {
-            &TextFormats::MultiLine(ref lines) => {
-                for (i, line) in lines.iter().enumerate() {
-                    let (start_horizontal_position, end_horizontal_position) =
-                        self.horizontal_text_position(line.to_string(), horizontal_position)?;
-
-                    let line_index = start_vertical_position + i * line_seperation + i;
-                    split_content[line_index]
-                        .replace_range(start_horizontal_position..end_horizontal_position, &line);
-                }
-            }
-            &TextFormats::SingleLine(ref line) => {
-                let (start_horizontal_position, end_horizontal_position) =
-                    self.horizontal_text_position(line.to_string(), horizontal_position)?;
-                split_content[start_vertical_position]
-                    .replace_range(start_horizontal_position..end_horizontal_position, &line);
-            }
-        }
-
-        self.content = split_content.join("");
-
-        Ok(())
-    }
-
-    fn split_contents(&self, input: String, chunk_size: usize) -> Vec<String> {
-        input
-            .as_bytes()
-            .chunks(chunk_size)
-            .map(|str| std::str::from_utf8(str).unwrap().to_string())
-            .collect::<Vec<String>>()
-    }
-
-    fn horizontal_text_position(
-        &self,
-        text: String,
-        position: InsertHorizontalPosition,
-    ) -> Result<(usize, usize), RenderError> {
-        let text_len = text.len();
-        if text_len > self.width {
-            return Err(RenderError::AddTextError("String is too long!"));
-        }
-        let position = match position {
-            InsertHorizontalPosition::Exact(pos) => {
-                if pos + text_len > self.width {
-                    return Err(RenderError::AddTextError(
-                        "Horizontal position overflows terminal size",
-                    ));
-                }
-                (pos, pos + text_len)
-            }
-            InsertHorizontalPosition::Center => {
-                let center_position = self.width / 2;
-                let start_position = center_position - text_len / 2;
-                (start_position, start_position + text_len)
-            }
-            InsertHorizontalPosition::Right => {
-                let start_position = self.width - text_len;
-                (start_position, self.width)
-            }
-        };
-
-        Ok(position)
-    }
-
-    fn vertical_text_position(
-        &self,
-        text: &TextFormats,
-        position: InsertVerticalPosition,
-        line_seperation: usize,
-    ) -> Result<usize, RenderError> {
-        let text_height = match text {
-            TextFormats::MultiLine(multi) => multi.len(),
-            TextFormats::SingleLine(_) => 1,
-        };
-        if text_height > self.height {
-            return Err(RenderError::AddTextError(
-                "Text has too many lines for screen",
-            ));
-        }
-
-        let text_height_with_padding = text_height + (text_height - 1) * line_seperation;
-
-        let vertical_start_position = match position {
-            InsertVerticalPosition::Bottom => self.height - text_height_with_padding,
-            InsertVerticalPosition::Center => (self.height - text_height_with_padding) / 2,
-            InsertVerticalPosition::Exact(position) => position,
-        };
-
-        if text_height_with_padding + vertical_start_position > self.height {
-            return Err(RenderError::AddTextError(
-                "Text and settings overflow screen height",
-            ));
-        }
-        Ok(vertical_start_position)
-    }
-}
-
-impl io::Write for EditorContents {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match std::str::from_utf8(buf) {
-            Ok(s) => {
-                self.set_contents(s.to_string());
-                Ok(s.len())
-            }
-            Err(_) => Err(io::ErrorKind::WriteZero.into()),
-        }
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        let out = write!(stdout(), "{}", self.content);
-        stdout().flush()?;
-        self.content.clear();
-        out
     }
 }
