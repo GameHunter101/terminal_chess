@@ -1,8 +1,11 @@
 use std::io::{self, stdout, Write};
 
 use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
+use rand::Rng;
 
-use crate::contents::{EditorContents, InsertHorizontalPosition, PlainText};
+use crate::contents::{
+    ButtonText, EditorContents, InsertHorizontalPosition, PlainText, TextContent,Text
+};
 
 pub struct Render {
     pub content: EditorContents,
@@ -36,17 +39,29 @@ impl Render {
 
     pub fn draw_rows(&mut self) {
         self.content
-            .row_contents
-            .edit_single_row(crate::contents::Text::Plain(PlainText::new(
+            .row_contents.edit_single_row(Text::Button(ButtonText::new(
                 "Hello Text",
                 self.width,
                 InsertHorizontalPosition::Center,
                 9,
+                button_click,
             )));
+		self.content.row_contents.edit_single_row(Text::Button(ButtonText::new("Another button", self.width, InsertHorizontalPosition::Right, 15, button_click_1)))
     }
 
     pub fn move_cursor(&mut self, direction: KeyCode) {
         self.cursor_controller.move_cursor(direction);
+    }
+
+    pub fn press_button(&self) {
+        let cursor_x = self.cursor_controller.cursor_x;
+        let cursor_y = self.cursor_controller.cursor_y;
+        for button in &self.content.row_contents.buttons[cursor_y] {
+            if button.position_x() <= cursor_x && button.position_x() + button.length() > cursor_x {
+				// dbg!(button.text());
+                (button.on_click)(cursor_x, cursor_y);
+            }
+        }
     }
 
     pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
@@ -62,6 +77,38 @@ impl Render {
         )?;
         self.content.flush()
     }
+}
+
+fn button_click(posx: usize, posy: usize) {
+    let mut rng = rand::thread_rng();
+    crossterm::queue!(
+        stdout(),
+        crossterm::style::SetForegroundColor(crossterm::style::Color::Rgb {
+            /* r: rng.gen_range(0..255),
+            g: rng.gen_range(0..255),
+            b: rng.gen_range(0..255), */
+			r:255,
+			g:255,
+			b:0,
+        })
+    )
+    .unwrap();
+}
+
+fn button_click_1(posx: usize, posy: usize) {
+    let mut rng = rand::thread_rng();
+    crossterm::queue!(
+        stdout(),
+        crossterm::style::SetBackgroundColor(crossterm::style::Color::Rgb {
+            // r: rng.gen_range(0..255),
+            // g: rng.gen_range(0..255),
+            // b: rng.gen_range(0..255),
+			r:0,
+			g:255,
+			b:255,
+        })
+    )
+    .unwrap();
 }
 
 #[derive(Debug)]

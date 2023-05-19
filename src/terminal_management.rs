@@ -48,7 +48,7 @@ impl Terminal {
             } => {
                 if !self.key_down {
                     self.key_down = true;
-                    let mut rng = rand::thread_rng();
+                    /* let mut rng = rand::thread_rng();
                     crossterm::queue!(
                         stdout(),
                         crossterm::style::SetForegroundColor(crossterm::style::Color::Rgb {
@@ -57,11 +57,18 @@ impl Terminal {
                             b: rng.gen_range(0..255),
                         })
                     )
-                    .unwrap();
+                    .unwrap(); */
                     self.render.move_cursor(direction);
                     self.key_down = false;
                 }
             }
+			KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: event::KeyModifiers::NONE,
+                ..
+            } => {
+				self.render.press_button();
+			},
             _ => {}
         }
         Ok(true)

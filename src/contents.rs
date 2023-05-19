@@ -58,6 +58,7 @@ impl io::Write for EditorContents {
 
 pub struct RowContents {
     pub rows: Vec<String>,
+	pub buttons: Vec<Vec<ButtonText>>,
     width: usize,
     height: usize,
 }
@@ -66,6 +67,7 @@ impl RowContents {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             rows: vec![" ".to_string().repeat(width); height],
+			buttons: vec![vec![];height],
             width,
             height,
         }
@@ -74,7 +76,10 @@ impl RowContents {
     pub fn edit_single_row(&mut self, text: Text) {
         let text = match text {
             Text::Plain(plain_text) => Box::new(plain_text) as Box<dyn TextContent>,
-            Text::Button(button_text) => Box::new(button_text) as Box<dyn TextContent>,
+            Text::Button(button_text) => {
+				self.buttons[button_text.position_y()].push(button_text);
+				Box::new(button_text) as Box<dyn TextContent>
+			},
         };
         let text_len = text.length();
 
@@ -185,13 +190,37 @@ impl TextContent for PlainText {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy,Debug)]
 pub struct ButtonText {
     text: &'static str,
     position_x: usize,
     position_y: usize,
     length: usize,
-    on_click: fn(usize, usize),
+    pub on_click: fn(usize, usize),
+}
+
+impl ButtonText {
+	pub fn new(
+        text: &'static str,
+        screen_width: usize,
+        horizontal_position: InsertHorizontalPosition,
+        vertical_position: usize,
+		callback: fn(usize,usize)
+    ) -> Self {
+        let text_len = text.len();
+        let start_position = match horizontal_position {
+            InsertHorizontalPosition::Exact(pos) => pos,
+            InsertHorizontalPosition::Center => (screen_width - text_len) / 2,
+            InsertHorizontalPosition::Right => screen_width - text_len - 1,
+        };
+        Self {
+            text,
+            position_x: start_position,
+            position_y: vertical_position,
+            length: text_len,
+			on_click: callback,
+        }
+    }
 }
 
 impl TextContent for ButtonText {
