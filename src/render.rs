@@ -1,8 +1,8 @@
 use std::io::{self, stdout, Write};
 
-use crossterm::{cursor, execute, queue, terminal};
+use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 
-use crate::terminal_management::EditorContents;
+use crate::contents::{EditorContents, InsertHorizontalPosition, PlainText};
 
 pub struct Render {
     pub content: EditorContents,
@@ -22,10 +22,10 @@ impl Render {
             ));
         }
         Ok(Self {
-            content: EditorContents::new(),
+            content: EditorContents::new(width, height),
             width,
             height,
-            cursor_controller: CursorController::new(),
+            cursor_controller: CursorController::new(width, height),
         })
     }
 
@@ -35,37 +35,24 @@ impl Render {
     }
 
     pub fn draw_rows(&mut self) {
-        for i in 0..self.height {
-            if i == self.height / 3 {
-                let mut welcome = format!("Pound Editor --- Version {}", 1.0);
-                if welcome.len() > self.width {
-                    welcome.truncate(self.width);
-                }
-                let mut padding = (self.width - welcome.len()) / 2;
-                if padding != 0 {
-                    self.content.push('~');
-                    padding -= 1;
-                }
-                (0..padding).for_each(|_| self.content.push(' '));
-                self.content.push_str(&welcome);
-            } else {
-                self.content.push('~');
-            }
-            queue!(
-                self.content,
-                terminal::Clear(terminal::ClearType::UntilNewLine)
-            )
-            .unwrap();
-            if i < self.height - 1 {
-                self.content.push_str("\r\n");
-            }
-            stdout().flush();
-        }
+        self.content
+            .row_contents
+            .edit_single_row(crate::contents::Text::Plain(PlainText::new(
+                "Hello Text",
+                self.width,
+                InsertHorizontalPosition::Center,
+                9,
+            )));
+    }
+
+    pub fn move_cursor(&mut self, direction: KeyCode) {
+        self.cursor_controller.move_cursor(direction);
     }
 
     pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
         queue!(self.content, cursor::Hide, cursor::MoveTo(0, 0))?;
         self.draw_rows();
+        self.content.rows_to_string();
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
         queue!(
@@ -98,13 +85,43 @@ impl std::error::Error for RenderError {
 struct CursorController {
     cursor_x: usize,
     cursor_y: usize,
+    width: usize,
+    height: usize,
 }
 
 impl CursorController {
-    pub fn new() -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         Self {
             cursor_x: 0,
             cursor_y: 0,
+            width,
+            height,
+        }
+    }
+
+    pub fn move_cursor(&mut self, direction: KeyCode) {
+        match direction {
+            KeyCode::Up => {
+                if self.cursor_y > 0 {
+                    self.cursor_y -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if self.cursor_y < self.height {
+                    self.cursor_y += 1;
+                }
+            }
+            KeyCode::Left => {
+                if self.cursor_x > 0 {
+                    self.cursor_x -= 1;
+                }
+            }
+            KeyCode::Right => {
+                if self.cursor_x < self.width {
+                    self.cursor_x += 1;
+                }
+            }
+            _ => unimplemented!(),
         }
     }
 }

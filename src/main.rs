@@ -4,6 +4,7 @@ use crossterm::{terminal};
 
 mod render;
 mod terminal_management;
+mod contents;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = terminal_management::Terminal::new()?;
