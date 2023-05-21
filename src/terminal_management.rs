@@ -1,14 +1,13 @@
 use std::{
     fmt,
-    io::{self, stdout, Write},
+    io::{self, stdin, stdout, Read, Write},
     time::Duration,
 };
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     queue, terminal,
 };
-use rand::Rng;
 
 use crate::render::{Render, RenderError};
 
@@ -18,64 +17,41 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Result<Self, RenderError> {
+    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             render: Render::new()?,
             key_down: false,
         })
     }
-    fn read_key(&self) -> crossterm::Result<KeyEvent> {
+    fn read_key(&mut self) -> crossterm::Result<KeyEvent> {
         loop {
-            // if event::poll(Duration::from_millis(500))? {
             if let Event::Key(event) = event::read()? {
                 return Ok(event);
             }
-            // }
         }
     }
 
     fn process_keypress(&mut self) -> crossterm::Result<bool> {
-        match self.read_key()? {
+        match self.read_key().unwrap() {
             KeyEvent {
                 code: KeyCode::Char('q'),
-                modifiers: event::KeyModifiers::CONTROL,
+                modifiers: KeyModifiers::CONTROL,
                 ..
             } => return Ok(false),
             KeyEvent {
-                code: direction @ ((KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right)),
-                modifiers: event::KeyModifiers::NONE,
+                code: direction @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
                 ..
-            } => {
-                if !self.key_down {
-                    self.key_down = true;
-                    /* let mut rng = rand::thread_rng();
-                    crossterm::queue!(
-                        stdout(),
-                        crossterm::style::SetForegroundColor(crossterm::style::Color::Rgb {
-                            r: rng.gen_range(0..255),
-                            g: rng.gen_range(0..255),
-                            b: rng.gen_range(0..255),
-                        })
-                    )
-                    .unwrap(); */
-                    self.render.move_cursor(direction);
-                    self.key_down = false;
-                }
-            }
-			KeyEvent {
-                code: KeyCode::Enter,
-                modifiers: event::KeyModifiers::NONE,
-                ..
-            } => {
-				self.render.press_button();
-			},
+            } => self.render.move_cursor(direction),
+            KeyEvent { code: KeyCode::Enter, .. } => self.render.press_button(),
             _ => {}
         }
         Ok(true)
     }
 
     pub fn run(&mut self) -> crossterm::Result<bool> {
-        self.render.refresh_screen()?;
+        self.render.refresh_screen().unwrap();
         self.process_keypress()
     }
 }

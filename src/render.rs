@@ -4,11 +4,12 @@ use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 use rand::Rng;
 
 use crate::contents::{
-    ButtonText, EditorContents, InsertHorizontalPosition, PlainText, TextContent,Text
+    ButtonText, Screen, InsertHorizontalPosition, PlainText, Text, TextContent, InsertVerticalPosition,
 };
 
 pub struct Render {
-    pub content: EditorContents,
+    pub screens: Vec<Screen>,
+    pub current_screen: usize,
     width: usize,
     height: usize,
     cursor_controller: CursorController,
@@ -25,7 +26,8 @@ impl Render {
             ));
         }
         Ok(Self {
-            content: EditorContents::new(width, height),
+            screens: vec![Screen::new(width, height)],
+            current_screen: 0,
             width,
             height,
             cursor_controller: CursorController::new(width, height),
@@ -37,16 +39,28 @@ impl Render {
         execute!(stdout(), cursor::MoveTo(0, 0))
     }
 
-    pub fn draw_rows(&mut self) {
-        self.content
-            .row_contents.edit_single_row(Text::Button(ButtonText::new(
-                "Hello Text",
-                self.width,
-                InsertHorizontalPosition::Center,
-                9,
-                button_click,
-            )));
-		self.content.row_contents.edit_single_row(Text::Button(ButtonText::new("Another button", self.width, InsertHorizontalPosition::Right, 15, button_click_1)))
+    pub fn draw_screen(&mut self) {
+        self.screens[self.current_screen].row_contents.edit_multiple_rows(
+            vec![
+                Text::Button(ButtonText::new(
+                    "Hello Text",
+                    self.width,
+                    InsertHorizontalPosition::Center,
+                    9,
+                    button_click,
+                )),
+                Text::Button(ButtonText::new(
+                    "Another button",
+                    self.width,
+                    InsertHorizontalPosition::Right,
+                    15,
+                    button_click_1,
+                )),
+            ],
+            2,
+            InsertVerticalPosition::Center,
+            InsertHorizontalPosition::Center,
+        )
     }
 
     pub fn move_cursor(&mut self, direction: KeyCode) {
@@ -56,26 +70,26 @@ impl Render {
     pub fn press_button(&self) {
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
-        for button in &self.content.row_contents.buttons[cursor_y] {
+        for button in &self.screens[self.current_screen].row_contents.buttons[cursor_y] {
             if button.position_x() <= cursor_x && button.position_x() + button.length() > cursor_x {
-				// dbg!(button.text());
+                // dbg!(button.text());
                 (button.on_click)(cursor_x, cursor_y);
             }
         }
     }
 
     pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
-        queue!(self.content, cursor::Hide, cursor::MoveTo(0, 0))?;
-        self.draw_rows();
-        self.content.rows_to_string();
+        queue!(self.screens[self.current_screen], cursor::Hide, cursor::MoveTo(0, 0))?;
+        self.draw_screen();
+        self.screens[self.current_screen].compile_screen();
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
         queue!(
-            self.content,
+            self.screens[self.current_screen],
             cursor::MoveTo(cursor_x as u16, cursor_y as u16),
             cursor::Show
         )?;
-        self.content.flush()
+        self.screens[self.current_screen].flush()
     }
 }
 
@@ -87,9 +101,9 @@ fn button_click(posx: usize, posy: usize) {
             /* r: rng.gen_range(0..255),
             g: rng.gen_range(0..255),
             b: rng.gen_range(0..255), */
-			r:255,
-			g:255,
-			b:0,
+            r: 255,
+            g: 255,
+            b: 0,
         })
     )
     .unwrap();
@@ -103,9 +117,9 @@ fn button_click_1(posx: usize, posy: usize) {
             // r: rng.gen_range(0..255),
             // g: rng.gen_range(0..255),
             // b: rng.gen_range(0..255),
-			r:0,
-			g:255,
-			b:255,
+            r: 0,
+            g: 255,
+            b: 255,
         })
     )
     .unwrap();

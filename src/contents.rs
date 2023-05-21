@@ -2,13 +2,13 @@ use std::io::{self, stdout, Write};
 
 use crossterm::{queue, terminal};
 
-pub struct EditorContents {
+pub struct Screen {
     content: String,
     pub row_contents: RowContents,
     height: usize,
 }
 
-impl EditorContents {
+impl Screen {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             content: String::new(),
@@ -25,7 +25,7 @@ impl EditorContents {
         self.content.push_str(string)
     }
 
-    pub fn rows_to_string(&mut self) {
+    pub fn compile_screen(&mut self) {
         // self.content.clear();
         let rows = self.row_contents.rows.clone();
         for i in 0..self.height {
@@ -37,7 +37,7 @@ impl EditorContents {
     }
 }
 
-impl io::Write for EditorContents {
+impl io::Write for Screen {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match std::str::from_utf8(buf) {
             Ok(s) => {
@@ -58,7 +58,7 @@ impl io::Write for EditorContents {
 
 pub struct RowContents {
     pub rows: Vec<String>,
-	pub buttons: Vec<Vec<ButtonText>>,
+    pub buttons: Vec<Vec<ButtonText>>,
     width: usize,
     height: usize,
 }
@@ -67,7 +67,7 @@ impl RowContents {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             rows: vec![" ".to_string().repeat(width); height],
-			buttons: vec![vec![];height],
+            buttons: vec![vec![]; height],
             width,
             height,
         }
@@ -77,9 +77,9 @@ impl RowContents {
         let text = match text {
             Text::Plain(plain_text) => Box::new(plain_text) as Box<dyn TextContent>,
             Text::Button(button_text) => {
-				self.buttons[button_text.position_y()].push(button_text);
-				Box::new(button_text) as Box<dyn TextContent>
-			},
+                self.buttons[button_text.position_y()].push(button_text);
+                Box::new(button_text) as Box<dyn TextContent>
+            }
         };
         let text_len = text.length();
 
@@ -106,16 +106,16 @@ impl RowContents {
 
         for (i, line) in text.iter().enumerate() {
             let row_number = start_vertical_position + i + i * row_spacing;
-            let line = match *line {
-                Text::Plain(plain_text) => Box::new(plain_text) as Box<dyn TextContent>,
-                Text::Button(button_text) => Box::new(button_text) as Box<dyn TextContent>,
+            let line_text = match *line {
+                Text::Plain(plain_text) => plain_text.text(),
+                Text::Button(button_text) => button_text.text(),
             };
-            self.edit_single_row(Text::Plain(PlainText::new(
-                line.text(),
-                self.width,
-                horizontal_position,
-                row_number,
-            )));
+
+            let text_object:Text = match line {
+                &Text::Plain(ref plain_text) => Text::Plain(PlainText::new(line_text, self.width, horizontal_position, row_number)),
+                &Text::Button(ref button_text) => Text::Button(ButtonText::new(line_text, self.width, horizontal_position, row_number, button_text.on_click)),
+            };
+            self.edit_single_row(text_object);
         }
     }
 }
@@ -190,7 +190,7 @@ impl TextContent for PlainText {
     }
 }
 
-#[derive(Clone, Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ButtonText {
     text: &'static str,
     position_x: usize,
@@ -200,12 +200,12 @@ pub struct ButtonText {
 }
 
 impl ButtonText {
-	pub fn new(
+    pub fn new(
         text: &'static str,
         screen_width: usize,
         horizontal_position: InsertHorizontalPosition,
         vertical_position: usize,
-		callback: fn(usize,usize)
+        callback: fn(usize, usize),
     ) -> Self {
         let text_len = text.len();
         let start_position = match horizontal_position {
@@ -218,7 +218,7 @@ impl ButtonText {
             position_x: start_position,
             position_y: vertical_position,
             length: text_len,
-			on_click: callback,
+            on_click: callback,
         }
     }
 }
