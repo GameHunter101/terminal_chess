@@ -4,16 +4,19 @@ use crossterm::{queue, terminal};
 
 pub struct Screen {
     content: String,
-    pub row_contents: RowContents,
-    height: usize,
+    pub screen_rows: ScreenRows,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl Screen {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new() -> Self {
+        let (term_width, term_height) = terminal::size().unwrap();
         Self {
             content: String::new(),
-            row_contents: RowContents::new(width, height),
-            height,
+            screen_rows: ScreenRows::new(term_width as usize, term_height as usize),
+            width: term_width as usize,
+            height: term_height as usize,
         }
     }
 
@@ -27,7 +30,7 @@ impl Screen {
 
     pub fn compile_screen(&mut self) {
         // self.content.clear();
-        let rows = self.row_contents.rows.clone();
+        let rows = self.screen_rows.rows.clone();
         for i in 0..self.height {
             self.push_str(&rows[i]);
 
@@ -56,18 +59,18 @@ impl io::Write for Screen {
     }
 }
 
-pub struct RowContents {
+pub struct ScreenRows {
     pub rows: Vec<String>,
     pub buttons: Vec<Vec<ButtonText>>,
     width: usize,
     height: usize,
 }
 
-impl RowContents {
+impl ScreenRows {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             rows: vec![" ".to_string().repeat(width); height],
-            buttons: vec![vec![]; height],
+            buttons: vec![Vec::new(); height],
             width,
             height,
         }
@@ -111,9 +114,22 @@ impl RowContents {
                 Text::Button(button_text) => button_text.text(),
             };
 
-            let text_object:Text = match line {
-                &Text::Plain(ref plain_text) => Text::Plain(PlainText::new(line_text, self.width, horizontal_position, row_number)),
-                &Text::Button(ref button_text) => Text::Button(ButtonText::new(line_text, self.width, horizontal_position, row_number, button_text.on_click)),
+            let text_object: Text = match line {
+                &Text::Plain(ref plain_text) => Text::Plain(PlainText::new(
+                    line_text,
+                    self.width,
+                    self.height,
+                    horizontal_position,
+                    InsertVerticalPosition::Exact(row_number),
+                )),
+                &Text::Button(ref button_text) => Text::Button(ButtonText::new(
+                    line_text,
+                    self.width,
+                    self.height,
+                    horizontal_position,
+                    InsertVerticalPosition::Exact(row_number),
+                    button_text.on_click,
+                )),
             };
             self.edit_single_row(text_object);
         }
@@ -157,19 +173,25 @@ impl PlainText {
     pub fn new(
         text: &'static str,
         screen_width: usize,
+        screen_height: usize,
         horizontal_position: InsertHorizontalPosition,
-        vertical_position: usize,
+        vertical_position: InsertVerticalPosition,
     ) -> Self {
         let text_len = text.len();
-        let start_position = match horizontal_position {
+        let horizontal_start_position = match horizontal_position {
             InsertHorizontalPosition::Exact(pos) => pos,
             InsertHorizontalPosition::Center => (screen_width - text_len) / 2,
             InsertHorizontalPosition::Right => screen_width - text_len - 1,
         };
+        let vertical_start_position = match vertical_position {
+            InsertVerticalPosition::Exact(pos) => pos,
+            InsertVerticalPosition::Center => screen_height / 2,
+            InsertVerticalPosition::Bottom => screen_height-1,
+        };
         Self {
             text,
-            position_x: start_position,
-            position_y: vertical_position,
+            position_x: horizontal_start_position,
+            position_y: vertical_start_position,
             length: text_len,
         }
     }
@@ -190,33 +212,39 @@ impl TextContent for PlainText {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct ButtonText {
     text: &'static str,
     position_x: usize,
     position_y: usize,
     length: usize,
-    pub on_click: fn(usize, usize),
+    pub on_click: Box<dyn Fn(usize, usize)-> ()>,
 }
 
 impl ButtonText {
     pub fn new(
         text: &'static str,
         screen_width: usize,
+        screen_height: usize,
         horizontal_position: InsertHorizontalPosition,
-        vertical_position: usize,
-        callback: fn(usize, usize),
+        vertical_position: InsertVerticalPosition,
+        callback: Box<dyn Fn(usize, usize)>,
     ) -> Self {
         let text_len = text.len();
-        let start_position = match horizontal_position {
+        let horizontal_start_position = match horizontal_position {
             InsertHorizontalPosition::Exact(pos) => pos,
             InsertHorizontalPosition::Center => (screen_width - text_len) / 2,
             InsertHorizontalPosition::Right => screen_width - text_len - 1,
         };
+        let vertical_start_position = match vertical_position {
+            InsertVerticalPosition::Exact(pos) => pos,
+            InsertVerticalPosition::Center => screen_height / 2,
+            InsertVerticalPosition::Bottom => screen_height-1,
+        };
         Self {
             text,
-            position_x: start_position,
-            position_y: vertical_position,
+            position_x: horizontal_start_position,
+            position_y: vertical_start_position,
             length: text_len,
             on_click: callback,
         }

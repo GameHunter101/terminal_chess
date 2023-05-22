@@ -3,8 +3,9 @@ use std::io::{self, stdout, Write};
 use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 use rand::Rng;
 
-use crate::contents::{
-    ButtonText, Screen, InsertHorizontalPosition, PlainText, Text, TextContent, InsertVerticalPosition,
+use crate::screen::{
+    ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, Text,
+    TextContent,
 };
 
 pub struct Render {
@@ -16,7 +17,7 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new() -> Result<Self, RenderError> {
+    pub fn new(screen: Screen) -> Result<Self, RenderError> {
         let (term_width, term_height) = terminal::size().unwrap();
         let width = term_width as usize;
         let height = term_height as usize;
@@ -26,7 +27,7 @@ impl Render {
             ));
         }
         Ok(Self {
-            screens: vec![Screen::new(width, height)],
+            screens: vec![screen],
             current_screen: 0,
             width,
             height,
@@ -39,30 +40,6 @@ impl Render {
         execute!(stdout(), cursor::MoveTo(0, 0))
     }
 
-    pub fn draw_screen(&mut self) {
-        self.screens[self.current_screen].row_contents.edit_multiple_rows(
-            vec![
-                Text::Button(ButtonText::new(
-                    "Hello Text",
-                    self.width,
-                    InsertHorizontalPosition::Center,
-                    9,
-                    button_click,
-                )),
-                Text::Button(ButtonText::new(
-                    "Another button",
-                    self.width,
-                    InsertHorizontalPosition::Right,
-                    15,
-                    button_click_1,
-                )),
-            ],
-            2,
-            InsertVerticalPosition::Center,
-            InsertHorizontalPosition::Center,
-        )
-    }
-
     pub fn move_cursor(&mut self, direction: KeyCode) {
         self.cursor_controller.move_cursor(direction);
     }
@@ -70,17 +47,20 @@ impl Render {
     pub fn press_button(&self) {
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
-        for button in &self.screens[self.current_screen].row_contents.buttons[cursor_y] {
+        for button in &self.screens[self.current_screen].screen_rows.buttons[cursor_y] {
             if button.position_x() <= cursor_x && button.position_x() + button.length() > cursor_x {
-                // dbg!(button.text());
                 (button.on_click)(cursor_x, cursor_y);
             }
         }
     }
 
     pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
-        queue!(self.screens[self.current_screen], cursor::Hide, cursor::MoveTo(0, 0))?;
-        self.draw_screen();
+        queue!(
+            self.screens[self.current_screen],
+            cursor::Hide,
+            cursor::MoveTo(0, 0)
+        )?;
+        
         self.screens[self.current_screen].compile_screen();
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
@@ -91,38 +71,14 @@ impl Render {
         )?;
         self.screens[self.current_screen].flush()
     }
-}
 
-fn button_click(posx: usize, posy: usize) {
-    let mut rng = rand::thread_rng();
-    crossterm::queue!(
-        stdout(),
-        crossterm::style::SetForegroundColor(crossterm::style::Color::Rgb {
-            /* r: rng.gen_range(0..255),
-            g: rng.gen_range(0..255),
-            b: rng.gen_range(0..255), */
-            r: 255,
-            g: 255,
-            b: 0,
-        })
-    )
-    .unwrap();
-}
+    pub fn new_screen(&mut self, screen: Screen) {
+        self.screens.push(screen);
+    }
 
-fn button_click_1(posx: usize, posy: usize) {
-    let mut rng = rand::thread_rng();
-    crossterm::queue!(
-        stdout(),
-        crossterm::style::SetBackgroundColor(crossterm::style::Color::Rgb {
-            // r: rng.gen_range(0..255),
-            // g: rng.gen_range(0..255),
-            // b: rng.gen_range(0..255),
-            r: 0,
-            g: 255,
-            b: 255,
-        })
-    )
-    .unwrap();
+    pub fn set_screen(&mut self, screen_index: usize) {
+        self.current_screen = screen_index;
+    }
 }
 
 #[derive(Debug)]
@@ -168,7 +124,7 @@ impl CursorController {
                 }
             }
             KeyCode::Down => {
-                if self.cursor_y < self.height {
+                if self.cursor_y < self.height - 1 {
                     self.cursor_y += 1;
                 }
             }
@@ -178,7 +134,7 @@ impl CursorController {
                 }
             }
             KeyCode::Right => {
-                if self.cursor_x < self.width {
+                if self.cursor_x < self.width - 1 {
                     self.cursor_x += 1;
                 }
             }

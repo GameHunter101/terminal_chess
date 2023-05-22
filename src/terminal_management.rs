@@ -17,11 +17,11 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            render: Render::new()?,
+    pub fn new(renderer: Render) -> Self {
+        Self {
+            render: renderer,
             key_down: false,
-        })
+        }
     }
     fn read_key(&mut self) -> crossterm::Result<KeyEvent> {
         loop {
