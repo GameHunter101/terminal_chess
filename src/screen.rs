@@ -1,4 +1,7 @@
 use std::io::{self, stdout, Write};
+use std::collections::HashMap;
+
+use crate::Render;
 
 use crossterm::{queue, terminal};
 
@@ -7,16 +10,20 @@ pub struct Screen {
     pub screen_rows: ScreenRows,
     pub width: usize,
     pub height: usize,
+	pub button_map: HashMap<&'static str, Box<dyn Fn()>>,
 }
 
 impl Screen {
-    pub fn new() -> Self {
+    pub fn new(button_map: HashMap<&'static str, Box<dyn Fn()>>) -> Self {
         let (term_width, term_height) = terminal::size().unwrap();
+		/* let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
+		button_map.insert("next_screen", Box::new(||{render.set_screen(1)})); */
         Self {
             content: String::new(),
             screen_rows: ScreenRows::new(term_width as usize, term_height as usize),
             width: term_width as usize,
             height: term_height as usize,
+			button_map,
         }
     }
 
@@ -186,7 +193,7 @@ impl PlainText {
         let vertical_start_position = match vertical_position {
             InsertVerticalPosition::Exact(pos) => pos,
             InsertVerticalPosition::Center => screen_height / 2,
-            InsertVerticalPosition::Bottom => screen_height-1,
+            InsertVerticalPosition::Bottom => screen_height - 1,
         };
         Self {
             text,
@@ -218,7 +225,7 @@ pub struct ButtonText {
     position_x: usize,
     position_y: usize,
     length: usize,
-    pub on_click: Box<dyn Fn(usize, usize)-> ()>,
+    pub on_click: &'static str,
 }
 
 impl ButtonText {
@@ -228,7 +235,7 @@ impl ButtonText {
         screen_height: usize,
         horizontal_position: InsertHorizontalPosition,
         vertical_position: InsertVerticalPosition,
-        callback: Box<dyn Fn(usize, usize)>,
+        on_click: &'static str,
     ) -> Self {
         let text_len = text.len();
         let horizontal_start_position = match horizontal_position {
@@ -239,14 +246,14 @@ impl ButtonText {
         let vertical_start_position = match vertical_position {
             InsertVerticalPosition::Exact(pos) => pos,
             InsertVerticalPosition::Center => screen_height / 2,
-            InsertVerticalPosition::Bottom => screen_height-1,
+            InsertVerticalPosition::Bottom => screen_height - 1,
         };
         Self {
             text,
             position_x: horizontal_start_position,
             position_y: vertical_start_position,
             length: text_len,
-            on_click: callback,
+            on_click,
         }
     }
 }

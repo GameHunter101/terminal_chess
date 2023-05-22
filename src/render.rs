@@ -1,4 +1,5 @@
 use std::io::{self, stdout, Write};
+use std::collections::HashMap;
 
 use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 use rand::Rng;
@@ -26,7 +27,7 @@ impl Render {
                 "Terminal size is too small!",
             ));
         }
-        Ok(Self {
+		Ok(Self {
             screens: vec![screen],
             current_screen: 0,
             width,
@@ -49,7 +50,12 @@ impl Render {
         let cursor_y = self.cursor_controller.cursor_y;
         for button in &self.screens[self.current_screen].screen_rows.buttons[cursor_y] {
             if button.position_x() <= cursor_x && button.position_x() + button.length() > cursor_x {
-                (button.on_click)(cursor_x, cursor_y);
+                let on_click = self.screens[self.current_screen]
+                    .button_map
+                    .get_key_value(button.on_click)
+                    .unwrap()
+                    .1;
+                on_click();
             }
         }
     }
@@ -60,7 +66,7 @@ impl Render {
             cursor::Hide,
             cursor::MoveTo(0, 0)
         )?;
-        
+
         self.screens[self.current_screen].compile_screen();
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
