@@ -67,7 +67,7 @@ r#" _______                       __               __      ______ __
             "Other Screen".to_string(),
             width,
             height,
-            screen::InsertHorizontalPosition::Exact(width-12),
+            screen::InsertHorizontalPosition::Right,
             screen::InsertVerticalPosition::Center,
             "last_screen",
         )));

@@ -5,6 +5,7 @@ use crate::Render;
 
 use crossterm::style::Stylize;
 use crossterm::{queue, terminal};
+use regex::Regex;
 
 pub struct Screen {
     content: String,
@@ -88,9 +89,9 @@ impl ScreenRows {
     pub fn edit_single_row(&mut self, text: Text) {
         let text_len = text.length();
 
-        // let mut row = self.rows[text.position_y()].clone();
-        // let string_before:String = row.drain(..text.position_x()).collect();
-        // let string_after:String = row.drain(text.length()..).collect();
+        let mut row = self.rows[text.position_y()].clone();
+        let string_before:String = row.drain(..text.position_x()).collect();
+        let string_after:String = row.drain(text.length()..).collect();
         /* dbg!(
             text.position_x(),
             text.position_x() + text_len,
@@ -99,11 +100,11 @@ impl ScreenRows {
             text.length(),
             text.text().len()
         ); */
-        self.rows[text.position_y()].replace_range(
+        /* self.rows[text.position_y()].replace_range(
             text.position_x()..text.position_x() + text_len,
             &text.text(),
-        );
-        // self.rows[text.position_y()] = format!("{}{}{}",string_before,text.text(),string_after);
+        ); */
+        self.rows[text.position_y()] = format!("{}{}{}",string_before,text.text(),string_after);
 
         match text {
             Text::Button(button) => self.buttons[button.position_y].push(button),
@@ -238,7 +239,9 @@ impl PlainText {
         horizontal_position: InsertHorizontalPosition,
         vertical_position: InsertVerticalPosition,
     ) -> Self {
-        let text_len = text.chars().count();
+        let re = Regex::new("\u{1b}\\[[^m]+m").unwrap();
+        let clean_string = re.replace_all(&text,"");
+        let text_len = clean_string.chars().count();
         let horizontal_start_position = match horizontal_position {
             InsertHorizontalPosition::Exact(pos) => pos,
             InsertHorizontalPosition::Center => (screen_width - text_len) / 2,
