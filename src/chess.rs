@@ -5,12 +5,14 @@ use crate::screen::{self, ButtonText, PlainText, Screen, Text, TextContent};
 
 pub struct Board {
     pieces: [[Piece; 8]; 8],
+    selected_piece: Option<(usize, usize)>,
 }
 
 impl Board {
     pub fn new() -> Self {
         Self {
             pieces: Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+            selected_piece: None,
         }
     }
 
@@ -46,51 +48,64 @@ impl Board {
     }
 
     pub fn display_board(&self, screen: &mut Screen) {
-        let mut board_rows: Vec<Text> = vec![];
-        /* for (rank_index, rank) in self.pieces.iter().enumerate() {
-            let rank_text = rank.map(|piece| piece.get_symbol()).join(" ");
+        let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
+        //     screen.button_map.insert(
+        //         "click_piece",
+        //         Box::new(|| {
+        // let piece_x = self.selected_piece.unwrap().0;
+        // let piece_y = self.selected_piece.unwrap().1;
+        //             let piece_string = &board_rows[piece_x].;
+        //         }),
+        //     );
+        for (rank_index, rank) in self.pieces.iter().enumerate() {
+            for (file_index, piece) in rank.iter().enumerate() {
+                let checker_index = (piece.file + piece.rank) % 2;
+                let piece_text = if checker_index == 0 {
+                    piece.get_symbol()
+                } else {
+                    piece.get_symbol() /* .on_dark_grey().to_string() */
+                };
+				// println!("{}",piece_text.clone().on_red());
+                // dbg!(&piece_text);
+                board_rows[rank_index].push(Text::Plain(PlainText::new(
+                    format!("{}",piece_text.on_red()),
+                    screen.width,
+                    screen.height,
+                    screen::InsertHorizontalPosition::Exact(file_index),
+                    screen::InsertVerticalPosition::Exact(rank_index),
+                    // "click_piece",
+                )));
+            }
+        }
+        // panic!("test");
 
-            board_rows.push(Text::Plain(PlainText::new(
-                rank_text,
-                screen.width,
-                screen.height,
-                screen::InsertHorizontalPosition::Exact(0),
-                screen::InsertVerticalPosition::Exact(rank_index),
-            )));
-        } */
-        
         /* board_rows.push(Text::Plain(PlainText::new(
             rank_text,
             screen.width,
             screen.height,
             screen::InsertHorizontalPosition::Exact(0),
             screen::InsertVerticalPosition::Exact(0),
-        )));
-        screen.screen_rows.edit_multiple_rows(
-            &board_rows,
-            0,
-            screen::InsertVerticalPosition::Exact(0),
-        ); */
-        
-        let rank_text = self.pieces[0].map(|piece| piece.get_symbol()).join(" ");
-        let text = Text::Plain(PlainText::new(
-            rank_text,
-            screen.width,
-            screen.height,
-            screen::InsertHorizontalPosition::Exact(0),
-            screen::InsertVerticalPosition::Exact(0),
-        ));
-        screen
-            .screen_rows
-            .edit_single_row(text);
+        ))); */
+        // dbg!(&board_rows);
+		
+   //      for row in board_rows {
+			// for piece in row {
+			// 	screen.screen_rows.edit_single_row(piece);
+			// }
+            /* screen.screen_rows.edit_multiple_rows(
+                &row,
+                0,
+                screen::InsertVerticalPosition::Exact(0),
+            ); */
+        // }
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct Piece {
     symbol: ChessPieces,
-    file: usize,
-    rank: usize,
+    pub file: usize,
+    pub rank: usize,
     white: bool,
 }
 
@@ -106,14 +121,21 @@ impl Piece {
 
     fn get_symbol(&self) -> String {
         let symbol = self.symbol.to_symbol();
-        match self.white {
-            true => symbol.white().to_string(),
-            false => symbol.black().on_white().to_string(),
-        }
+        /* match self.white {
+            true => {
+                if self.symbol == ChessPieces::None {
+                    symbol.hidden().to_string()
+                } else {
+                    symbol.white().to_string()
+                }
+            }
+            false => symbol.red().to_string(),
+        } */
+        symbol
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ChessPieces {
     None,
     King,

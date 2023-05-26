@@ -88,10 +88,11 @@ impl ScreenRows {
 
     pub fn edit_single_row(&mut self, text: Text) {
         let text_len = text.length();
-
-        let mut row = self.rows[text.position_y()].clone();
-        let string_before:String = row.drain(..text.position_x()).collect();
-        let string_after:String = row.drain(text.length()..).collect();
+        // dbg!(&text);
+        let mut row_chars: Vec<char> = self.rows[text.position_y()].clone().chars().collect();
+        let string_before:String = row_chars[..text.position_x()].iter().collect();
+        // let string_before:String = row.drain(..text.position_x()).collect();
+        let string_after:String = row_chars[text.position_x() + text.length()..].iter().collect();
         /* dbg!(
             text.position_x(),
             text.position_x() + text_len,
@@ -104,7 +105,7 @@ impl ScreenRows {
             text.position_x()..text.position_x() + text_len,
             &text.text(),
         ); */
-        self.rows[text.position_y()] = format!("{}{}{}",string_before,text.text(),string_after);
+        self.rows[text.position_y()] = format!("{}{}{}", string_before, text.text(), string_after);
 
         match text {
             Text::Button(button) => self.buttons[button.position_y].push(button),
@@ -157,20 +158,22 @@ pub enum InsertVerticalPosition {
     Bottom,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Text {
     Plain(PlainText),
     Button(ButtonText),
 }
 
 impl Text {
-    fn new(
+    pub fn new(
         text: String,
         position_x: usize,
         position_y: usize,
         on_click: Option<&'static str>,
     ) -> Self {
-        let length = text.chars().count();
+        let re = Regex::new("\u{1b}\\[[^m]+m").unwrap();
+        let clean_string = re.replace_all(&text, "");
+        let length = clean_string.chars().count();
         match on_click {
             None => Self::Plain(PlainText {
                 text,
@@ -223,7 +226,7 @@ impl TextContent for Text {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PlainText {
     pub text: String,
     pub position_x: usize,
@@ -240,7 +243,7 @@ impl PlainText {
         vertical_position: InsertVerticalPosition,
     ) -> Self {
         let re = Regex::new("\u{1b}\\[[^m]+m").unwrap();
-        let clean_string = re.replace_all(&text,"");
+        let clean_string = re.replace_all(&text, "");
         let text_len = clean_string.chars().count();
         let horizontal_start_position = match horizontal_position {
             InsertHorizontalPosition::Exact(pos) => pos,
@@ -298,7 +301,7 @@ impl std::default::Default for PlainText {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ButtonText {
     pub text: String,
     pub position_x: usize,
@@ -316,7 +319,9 @@ impl ButtonText {
         vertical_position: InsertVerticalPosition,
         on_click: &'static str,
     ) -> Self {
-        let text_len = text.chars().count();
+        let re = Regex::new("\u{1b}\\[[^m]+m").unwrap();
+        let clean_string = re.replace_all(&text, "");
+        let text_len = clean_string.chars().count();
         let horizontal_start_position = match horizontal_position {
             InsertHorizontalPosition::Exact(pos) => pos,
             InsertHorizontalPosition::Center => (screen_width - text_len) / 2,
