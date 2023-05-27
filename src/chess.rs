@@ -49,55 +49,32 @@ impl Board {
 
     pub fn display_board(&self, screen: &mut Screen) {
         let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
-        //     screen.button_map.insert(
-        //         "click_piece",
-        //         Box::new(|| {
-        // let piece_x = self.selected_piece.unwrap().0;
-        // let piece_y = self.selected_piece.unwrap().1;
-        //             let piece_string = &board_rows[piece_x].;
-        //         }),
-        //     );
+
         for (rank_index, rank) in self.pieces.iter().enumerate() {
             for (file_index, piece) in rank.iter().enumerate() {
                 let checker_index = (piece.file + piece.rank) % 2;
                 let piece_text = if checker_index == 0 {
                     piece.get_symbol()
                 } else {
-                    piece.get_symbol() /* .on_dark_grey().to_string() */
+                    piece.get_symbol().on(crossterm::style::Color::AnsiValue(237)).to_string()
                 };
-				// println!("{}",piece_text.clone().on_red());
-                // dbg!(&piece_text);
+
                 board_rows[rank_index].push(Text::Plain(PlainText::new(
-                    format!("{}",piece_text.on_red()),
+                    piece_text,
                     screen.width,
                     screen.height,
-                    screen::InsertHorizontalPosition::Exact(file_index),
+                    screen::InsertHorizontalPosition::Exact(file_index * 2),
                     screen::InsertVerticalPosition::Exact(rank_index),
                     // "click_piece",
                 )));
             }
         }
-        // panic!("test");
 
-        /* board_rows.push(Text::Plain(PlainText::new(
-            rank_text,
-            screen.width,
-            screen.height,
-            screen::InsertHorizontalPosition::Exact(0),
-            screen::InsertVerticalPosition::Exact(0),
-        ))); */
-        // dbg!(&board_rows);
-		
-   //      for row in board_rows {
-			// for piece in row {
-			// 	screen.screen_rows.edit_single_row(piece);
-			// }
-            /* screen.screen_rows.edit_multiple_rows(
-                &row,
-                0,
-                screen::InsertVerticalPosition::Exact(0),
-            ); */
-        // }
+        for row in board_rows {
+            for piece in row {
+                screen.screen_rows.edit_single_row(piece);
+            }
+        }
     }
 }
 
@@ -121,7 +98,7 @@ impl Piece {
 
     fn get_symbol(&self) -> String {
         let symbol = self.symbol.to_symbol();
-        /* match self.white {
+        match self.white {
             true => {
                 if self.symbol == ChessPieces::None {
                     symbol.hidden().to_string()
@@ -130,8 +107,7 @@ impl Piece {
                 }
             }
             false => symbol.red().to_string(),
-        } */
-        symbol
+        }
     }
 }
 

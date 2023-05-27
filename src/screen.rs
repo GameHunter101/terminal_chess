@@ -42,7 +42,7 @@ impl Screen {
         let rows = self.screen_rows.rows.clone();
         for row in rows {
             // println!("Row: {}",row);
-            self.push_str(&row);
+            self.push_str(&row.join(""));
 
             queue!(self, terminal::Clear(terminal::ClearType::UntilNewLine)).unwrap();
         }
@@ -70,7 +70,7 @@ impl io::Write for Screen {
 }
 
 pub struct ScreenRows {
-    pub rows: Vec<String>,
+    pub rows: Vec<Vec<String>>,
     pub buttons: Vec<Vec<ButtonText>>,
     width: usize,
     height: usize,
@@ -79,33 +79,79 @@ pub struct ScreenRows {
 impl ScreenRows {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
-            rows: vec![" ".to_string().repeat(width); height],
+            rows: vec![vec![" ".to_string(); width]; height],
             buttons: vec![Vec::new(); height],
             width,
             height,
         }
     }
 
+    // Splits a given string into characters, appends ANSI formatting on first and last characters
+    fn split_ansi_string(&self, text: String, text_len: usize) -> Vec<String> {
+        let escape_indices = text
+            .match_indices("\u{1b}")
+            .map(|(i, _)| i)
+            .collect::<Vec<usize>>();
+
+        let main_string: Vec<String> = {
+            if escape_indices.len() > 1 {
+                let back_escape_index = escape_indices[escape_indices.len() / 2];
+                let front_ansi: String = (&text.chars().collect::<Vec<char>>()
+                    [..back_escape_index - text_len])
+                    .iter()
+                    .collect();
+                let back_ansi: String = (&text.chars().collect::<Vec<char>>()
+                    [back_escape_index..])
+                    .iter()
+                    .collect();
+
+                let chars: Vec<char> = (&text.chars().collect::<Vec<char>>()
+                    [back_escape_index - text_len..back_escape_index])
+                    .to_vec();
+                let mut strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
+                let last_index = &strings.len() - 1;
+                let mut first_element = front_ansi;
+                first_element.push_str(&strings[0]);
+                strings[0] = first_element;
+                let mut last_element = strings[last_index].clone();
+                last_element.push_str(&back_ansi);
+                strings[last_index] = last_element;
+                strings
+            } else {
+                let chars: Vec<char> = text.to_string().chars().collect();
+                let strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
+                strings
+            }
+        };
+        main_string
+    }
+
     pub fn edit_single_row(&mut self, text: Text) {
         let text_len = text.length();
-        // dbg!(&text);
-        let mut row_chars: Vec<char> = self.rows[text.position_y()].clone().chars().collect();
-        let string_before:String = row_chars[..text.position_x()].iter().collect();
-        // let string_before:String = row.drain(..text.position_x()).collect();
-        let string_after:String = row_chars[text.position_x() + text.length()..].iter().collect();
-        /* dbg!(
-            text.position_x(),
-            text.position_x() + text_len,
-            self.width,
-            text.text(),
-            text.length(),
-            text.text().len()
-        ); */
-        /* self.rows[text.position_y()].replace_range(
-            text.position_x()..text.position_x() + text_len,
-            &text.text(),
-        ); */
-        self.rows[text.position_y()] = format!("{}{}{}", string_before, text.text(), string_after);
+
+        let split_text = self.split_ansi_string(text.text(), text_len);
+
+        for (i,str) in split_text.iter().enumerate() {
+            self.rows[text.position_y()][i+text.position_x()] = str.to_string();
+        }
+
+        /* let mut row_chars: Vec<char> = self.rows[text.position_y()].clone().chars().collect();
+        let string_before: String = row_chars[..text.position_x()].iter().collect();
+        let string_after: String = row_chars[text.position_x() + text.length()..]
+            .iter()
+            .collect();
+
+        let mut combined = string_before.clone();
+        combined.push_str(&text.text());
+        combined.push_str(&string_after);
+        dbg!(combined);
+
+        self.rows[text.position_y()] = format!("{}{}{}", string_before, text.text(), string_after); */
+
+        // self.rows[text.position_y()].replace_range(
+        //     text.position_x()..text.position_x() + text_len,
+        //     &text.text(),
+        // );
 
         match text {
             Text::Button(button) => self.buttons[button.position_y].push(button),
