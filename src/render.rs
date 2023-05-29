@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::io::{self, stdout, Write};
 
+use crossterm::style::{Color, Stylize};
 use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 use rand::Rng;
+use regex::Regex;
 
+use crate::chess::ChessPieces;
 use crate::screen::{
-    ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, Text,
-    TextContent,
+    ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, ScreenRows,
+    Text, TextContent,
 };
 
 pub struct Render {
@@ -48,14 +51,87 @@ impl Render {
     pub fn press_button(&mut self) {
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
-        for button in &self.screens[self.current_screen].screen_rows.buttons[cursor_y] {
+        let current_screen = &mut self.screens[self.current_screen];
+        for button in current_screen.screen_rows.buttons[cursor_y].clone() {
             if button.position_x <= cursor_x && button.position_x + button.length > cursor_x {
                 if button.on_click == "next_screen" {
                     self.current_screen += 1;
                 } else if button.on_click == "last_screen" {
                     self.current_screen -= 1;
+                } else if button.on_click == "click_piece" {
+                    if let Some(board) = &mut current_screen.game {
+                        let piece = board.pieces[cursor_y][cursor_x / 2];
+                        if piece.symbol != ChessPieces::None {
+                            let piece_text = piece.get_symbol().on_dark_yellow().to_string();
+
+                            if let Some(previously_selected_coords) = board.selected_piece {
+                                current_screen.screen_rows.edit_single_row(Text::new(
+                                    piece_text,
+                                    cursor_x,
+                                    cursor_y,
+                                    Some("click_piece"),
+                                ));
+
+                                let previously_selected_piece = board.pieces
+                                    [previously_selected_coords.0][previously_selected_coords.1];
+                                let previous_piece_checker_index = (previously_selected_piece.file
+                                    + previously_selected_piece.rank)
+                                    % 2;
+                                let previous_piece_text = if previous_piece_checker_index == 0 {
+                                    previously_selected_piece.get_symbol().to_string()
+                                } else {
+                                    previously_selected_piece
+                                        .get_symbol()
+                                        .on(crossterm::style::Color::AnsiValue(237))
+                                        .to_string()
+                                };
+
+                                current_screen
+                                    .screen_rows
+                                    .clear_row(InsertVerticalPosition::Bottom);
+                                current_screen.screen_rows.edit_single_row(Text::Plain(
+                                    PlainText::new(
+                                        format!(
+                                            "Previous: {:?}, previous coords: {:?} current coords: {:?}",
+                                            previously_selected_piece.symbol,
+                                            previously_selected_coords,
+                                            (cursor_y, cursor_x/2)
+                                        ),
+                                        current_screen.width,
+                                        current_screen.height,
+                                        InsertHorizontalPosition::Exact(0),
+                                        InsertVerticalPosition::Bottom,
+                                    ),
+                                ));
+                                current_screen.screen_rows.edit_single_row(Text::new(
+                                    previous_piece_text,
+                                    previously_selected_coords.1 * 2,
+                                    previously_selected_coords.0,
+                                    Some("click_piece"),
+                                ));
+                            } else {
+                                current_screen.screen_rows.edit_single_row(Text::new(
+                                    piece_text,
+                                    cursor_x,
+                                    cursor_y,
+                                    Some("click_piece"),
+                                ));
+                            }
+                            board.set_selected(cursor_y, cursor_x / 2);
+                        }
+                    }
+                    /* let piece = current_screen.screen_rows.rows[cursor_y][cursor_x].clone();
+
+
+                    current_screen.screen_rows.edit_single_row(Text::new(
+                        piece/* .with(color).on_yellow() */.to_string(),
+                        /* piece.on(crossterm::style::Color::Reset).with(crossterm::style::Color::Reset)/* .on_dark_yellow() */.to_string(), */
+                        cursor_x,
+                        cursor_y,
+                        Some("click_piece"),
+                    )); */
                 } else {
-                    let on_click = self.screens[self.current_screen]
+                    let on_click = current_screen
                         .button_map
                         .get_key_value(button.on_click)
                         .unwrap()

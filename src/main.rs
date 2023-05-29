@@ -3,24 +3,24 @@
 use std::collections::HashMap;
 use std::io;
 
-use chess::Board;
+use chess::{Board, Piece};
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use crossterm::style::Stylize;
 use crossterm::terminal;
 use render::Render;
 use screen::{ButtonText, PlainText, Screen, Text};
 
+mod chess;
 mod render;
 mod screen;
 mod terminal_management;
-mod chess;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (width, height) = terminal::size().unwrap();
     let width = width as usize;
     let height = height as usize;
     let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
-    let mut initial_screen = Screen::new(button_map);
+    let mut initial_screen = Screen::new(button_map, None);
     initial_screen.screen_rows.edit_multiple_rows(
         &PlainText::from_multi_lines(
 r#" _______                       __               __      ______ __                      
@@ -46,19 +46,13 @@ r#" _______                       __               __      ______ __
             "next_screen",
         )));
 
-    // (&mut initial_screen).button_map.insert("next_screen", Box::new(|| {crossterm::queue!(io::stdout(),crossterm::style::SetBackgroundColor(crossterm::style::Color::Rgb { r: 50, g: 0, b: 50 }));}));
-
     let mut renderer = render::Render::new(initial_screen)?;
 
-    // initial_screen.button_map.insert("next_screen", Box::new(||{}));
-
-    // (&mut initial_screen).button_map.insert("next_screen", Box::new(|| {renderer.set_screen(1)}));
+    let chess_game = Board::new();
 
     let mut game_button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
 
-    let mut game_screen = Screen::new(game_button_map);
-
-    let chess_game = Board::new();
+    let mut game_screen = Screen::new(game_button_map, Some(chess_game));
 
     chess_game.display_board(&mut game_screen);
 
@@ -81,4 +75,8 @@ r#" _______                       __               __      ______ __
     terminal::enable_raw_mode().expect("Could not turn on raw mode");
     while terminal.run().unwrap() {}
     Ok(())
+}
+
+fn query_board(board: &Board, pos_x: usize, pos_y: usize) -> Piece {
+    board.pieces[pos_y][pos_x]
 }

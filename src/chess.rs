@@ -3,9 +3,10 @@ use crossterm::terminal;
 
 use crate::screen::{self, ButtonText, PlainText, Screen, Text, TextContent};
 
+#[derive(Clone, Copy, Debug)]
 pub struct Board {
-    pieces: [[Piece; 8]; 8],
-    selected_piece: Option<(usize, usize)>,
+    pub pieces: [[Piece; 8]; 8],
+    pub selected_piece: Option<(usize, usize)>,
 }
 
 impl Board {
@@ -50,22 +51,42 @@ impl Board {
     pub fn display_board(&self, screen: &mut Screen) {
         let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
 
+        /* screen.button_map.insert(
+            "click_piece",
+            Box::new(|| {
+                let selected_x = self.selected_piece.unwrap().0;
+                let selected_y = self.selected_piece.unwrap().1;
+
+                let selected_text_object = board_rows[selected_x][selected_y].clone();
+
+                board_rows[selected_x][selected_y] = Text::new(
+                    selected_text_object.text().rapid_blink().to_string(),
+                    selected_text_object.position_x(),
+                    selected_text_object.position_y(),
+                    Some("click_piece"),
+                );
+            }),
+        ); */
+
         for (rank_index, rank) in self.pieces.iter().enumerate() {
             for (file_index, piece) in rank.iter().enumerate() {
                 let checker_index = (piece.file + piece.rank) % 2;
                 let piece_text = if checker_index == 0 {
                     piece.get_symbol()
                 } else {
-                    piece.get_symbol().on(crossterm::style::Color::AnsiValue(237)).to_string()
+                    piece
+                        .get_symbol()
+                        .on(crossterm::style::Color::AnsiValue(237))
+                        .to_string()
                 };
 
-                board_rows[rank_index].push(Text::Plain(PlainText::new(
+                board_rows[rank_index].push(Text::Button(ButtonText::new(
                     piece_text,
                     screen.width,
                     screen.height,
                     screen::InsertHorizontalPosition::Exact(file_index * 2),
                     screen::InsertVerticalPosition::Exact(rank_index),
-                    // "click_piece",
+                    "click_piece",
                 )));
             }
         }
@@ -76,18 +97,23 @@ impl Board {
             }
         }
     }
+
+    pub fn set_selected(&mut self, rank: usize, file: usize) -> Self {
+        self.selected_piece = Some((rank, file));
+        *self
+    }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Piece {
-    symbol: ChessPieces,
+    pub symbol: ChessPieces,
     pub file: usize,
     pub rank: usize,
-    white: bool,
+    pub white: bool,
 }
 
 impl Piece {
-    fn none() -> Self {
+    pub fn none() -> Self {
         Self {
             symbol: ChessPieces::None,
             file: 0,
@@ -96,7 +122,7 @@ impl Piece {
         }
     }
 
-    fn get_symbol(&self) -> String {
+    pub fn get_symbol(&self) -> String {
         let symbol = self.symbol.to_symbol();
         match self.white {
             true => {
@@ -111,7 +137,7 @@ impl Piece {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ChessPieces {
     None,
     King,

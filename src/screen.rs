@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::{self, stdout, Write};
 
+use crate::chess::Board;
 use crate::Render;
 
 use crossterm::style::Stylize;
@@ -13,10 +14,11 @@ pub struct Screen {
     pub width: usize,
     pub height: usize,
     pub button_map: HashMap<&'static str, Box<dyn Fn()>>,
+    pub game: Option<Board>,
 }
 
 impl Screen {
-    pub fn new(button_map: HashMap<&'static str, Box<dyn Fn()>>) -> Self {
+    pub fn new(button_map: HashMap<&'static str, Box<dyn Fn()>>, board: Option<Board>) -> Self {
         let (term_width, term_height) = terminal::size().unwrap();
         /* let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
         button_map.insert("next_screen", Box::new(||{render.set_screen(1)})); */
@@ -26,6 +28,7 @@ impl Screen {
             width: term_width as usize,
             height: term_height as usize,
             button_map,
+            game: board,
         }
     }
 
@@ -87,76 +90,63 @@ impl ScreenRows {
     }
 
     // Splits a given string into characters, appends ANSI formatting on first and last characters
-    fn split_ansi_string(&self, text: String, text_len: usize) -> Vec<String> {
+    pub fn split_ansi_string(text: String, text_len: usize) -> Vec<String> {
         let escape_indices = text
             .match_indices("\u{1b}")
             .map(|(i, _)| i)
             .collect::<Vec<usize>>();
 
-        let main_string: Vec<String> = {
-            if escape_indices.len() > 1 {
-                let back_escape_index = escape_indices[escape_indices.len() / 2];
-                let front_ansi: String = (&text.chars().collect::<Vec<char>>()
-                    [..back_escape_index - text_len])
-                    .iter()
-                    .collect();
-                let back_ansi: String = (&text.chars().collect::<Vec<char>>()
-                    [back_escape_index..])
-                    .iter()
-                    .collect();
+        if escape_indices.len() > 1 {
+            let back_escape_index = escape_indices[escape_indices.len() / 2];
+            let front_ansi: String = (&text.chars().collect::<Vec<char>>()
+                [..back_escape_index - text_len])
+                .iter()
+                .collect();
+            let back_ansi: String = (&text.chars().collect::<Vec<char>>()[back_escape_index..])
+                .iter()
+                .collect();
 
-                let chars: Vec<char> = (&text.chars().collect::<Vec<char>>()
-                    [back_escape_index - text_len..back_escape_index])
-                    .to_vec();
-                let mut strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
-                let last_index = &strings.len() - 1;
-                let mut first_element = front_ansi;
-                first_element.push_str(&strings[0]);
-                strings[0] = first_element;
-                let mut last_element = strings[last_index].clone();
-                last_element.push_str(&back_ansi);
-                strings[last_index] = last_element;
-                strings
-            } else {
-                let chars: Vec<char> = text.to_string().chars().collect();
-                let strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
-                strings
-            }
-        };
-        main_string
+            let chars: Vec<char> = (&text.chars().collect::<Vec<char>>()
+                [back_escape_index - text_len..back_escape_index])
+                .to_vec();
+            let mut strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
+            let last_index = &strings.len() - 1;
+            let mut first_element = front_ansi;
+            first_element.push_str(&strings[0]);
+            strings[0] = first_element;
+            let mut last_element = strings[last_index].clone();
+            last_element.push_str(&back_ansi);
+            strings[last_index] = last_element;
+            strings
+        } else {
+            let chars: Vec<char> = text.to_string().chars().collect();
+            let strings: Vec<String> = chars.iter().map(|c| c.to_string()).collect();
+            strings
+        }
     }
 
     pub fn edit_single_row(&mut self, text: Text) {
         let text_len = text.length();
 
-        let split_text = self.split_ansi_string(text.text(), text_len);
+        let split_text = ScreenRows::split_ansi_string(text.text(), text_len);
 
-        for (i,str) in split_text.iter().enumerate() {
-            self.rows[text.position_y()][i+text.position_x()] = str.to_string();
+        for (i, str) in split_text.iter().enumerate() {
+            self.rows[text.position_y()][i + text.position_x()] = str.to_string();
         }
-
-        /* let mut row_chars: Vec<char> = self.rows[text.position_y()].clone().chars().collect();
-        let string_before: String = row_chars[..text.position_x()].iter().collect();
-        let string_after: String = row_chars[text.position_x() + text.length()..]
-            .iter()
-            .collect();
-
-        let mut combined = string_before.clone();
-        combined.push_str(&text.text());
-        combined.push_str(&string_after);
-        dbg!(combined);
-
-        self.rows[text.position_y()] = format!("{}{}{}", string_before, text.text(), string_after); */
-
-        // self.rows[text.position_y()].replace_range(
-        //     text.position_x()..text.position_x() + text_len,
-        //     &text.text(),
-        // );
 
         match text {
             Text::Button(button) => self.buttons[button.position_y].push(button),
             _ => {}
         };
+    }
+
+    pub fn clear_row(&mut self, row: InsertVerticalPosition) {
+        let row_num = match row {
+            InsertVerticalPosition::Bottom => self.height-1,
+            InsertVerticalPosition::Center => self.height / 2,
+            InsertVerticalPosition::Exact(num) => num,
+        };
+        self.rows[row_num] = vec![" ".to_string(); self.width];
     }
 
     pub fn edit_multiple_rows(

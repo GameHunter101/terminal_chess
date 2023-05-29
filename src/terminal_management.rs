@@ -13,15 +13,11 @@ use crate::render::{Render, RenderError};
 
 pub struct Terminal {
     render: Render,
-    key_down: bool,
 }
 
 impl Terminal {
     pub fn new(renderer: Render) -> Self {
-        Self {
-            render: renderer,
-            key_down: false,
-        }
+        Self { render: renderer }
     }
     fn read_key(&mut self) -> crossterm::Result<KeyEvent> {
         loop {
@@ -44,7 +40,12 @@ impl Terminal {
                 kind: KeyEventKind::Press,
                 ..
             } => self.render.move_cursor(direction),
-            KeyEvent { code: KeyCode::Enter, .. } => self.render.press_button(),
+            KeyEvent {
+                code: KeyCode::Enter,
+                kind: KeyEventKind::Press,
+                ..
+            } => self.render.press_button(),
+
             _ => {}
         }
         Ok(true)
