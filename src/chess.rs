@@ -51,23 +51,6 @@ impl Board {
     pub fn display_board(&self, screen: &mut Screen) {
         let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
 
-        /* screen.button_map.insert(
-            "click_piece",
-            Box::new(|| {
-                let selected_x = self.selected_piece.unwrap().0;
-                let selected_y = self.selected_piece.unwrap().1;
-
-                let selected_text_object = board_rows[selected_x][selected_y].clone();
-
-                board_rows[selected_x][selected_y] = Text::new(
-                    selected_text_object.text().rapid_blink().to_string(),
-                    selected_text_object.position_x(),
-                    selected_text_object.position_y(),
-                    Some("click_piece"),
-                );
-            }),
-        ); */
-
         for (rank_index, rank) in self.pieces.iter().enumerate() {
             for (file_index, piece) in rank.iter().enumerate() {
                 let checker_index = (piece.file + piece.rank) % 2;
@@ -102,6 +85,12 @@ impl Board {
         self.selected_piece = Some((rank, file));
         *self
     }
+
+    
+    pub fn query_board(&self, rank: usize, file: usize) -> (Piece, String) {
+        let piece = self.pieces[rank][file];
+        let piece_text = 
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -135,6 +124,69 @@ impl Piece {
             false => symbol.red().to_string(),
         }
     }
+
+    pub fn possible_moves(&self) -> Vec<(usize, usize)> {
+        match self.symbol {
+            ChessPieces::Pawn => {
+                let mut moves = vec![];
+
+                if self.white {
+                    moves.push((self.rank - 1, self.file));
+                    if self.rank == 6 {
+                        moves.push((self.rank - 2, self.file));
+                    }
+                } else {
+                    moves.push((self.rank + 1, self.file));
+                    if self.rank == 1 {
+                        moves.push((self.rank + 2, self.file));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Rook => {
+                let mut moves = vec![];
+
+                for i in 0..8 {
+                    if i != self.file {
+                        moves.push((self.rank, i));
+                    }
+                    if i != self.rank {
+                        moves.push((i, self.file));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Knight => {
+                let mut moves = vec![];
+                let mut offsets: Vec<(i32, i32)> = vec![];
+                offsets.push((2, 1));
+                offsets.push((2, -1));
+                offsets.push((-2, 1));
+                offsets.push((-2, -1));
+
+                offsets.push((1, 2));
+                offsets.push((1, -2));
+                offsets.push((-1, 2));
+                offsets.push((-1, -2));
+
+                for (off_x, off_y) in offsets {
+                    let file = self.file as i32 + off_x;
+                    let rank = self.rank as i32 + off_y;
+                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
+                        moves.push((rank as usize, file as usize));
+                    }
+                }
+
+                moves
+            }
+            _ => {
+                vec![]
+            }
+        }
+    }
+
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
