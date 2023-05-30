@@ -142,7 +142,7 @@ impl ScreenRows {
 
     pub fn clear_row(&mut self, row: InsertVerticalPosition) {
         let row_num = match row {
-            InsertVerticalPosition::Bottom => self.height-1,
+            InsertVerticalPosition::Bottom => self.height - 1,
             InsertVerticalPosition::Center => self.height / 2,
             InsertVerticalPosition::Exact(num) => num,
         };

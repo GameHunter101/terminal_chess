@@ -60,63 +60,68 @@ impl Render {
                     self.current_screen -= 1;
                 } else if button.on_click == "click_piece" {
                     if let Some(board) = &mut current_screen.game {
-                        let piece = board.pieces[cursor_y][cursor_x / 2];
+                        let piece = board.query_board(cursor_y, cursor_x / 2).0;
                         if piece.symbol != ChessPieces::None {
                             let piece_text = piece.get_symbol().on_dark_yellow().to_string();
 
-                            if let Some(previously_selected_coords) = board.selected_piece {
-                                current_screen.screen_rows.edit_single_row(Text::new(
-                                    piece_text,
-                                    cursor_x,
-                                    cursor_y,
-                                    Some("click_piece"),
-                                ));
+                            if let Some(previous_coords) = board.selected_piece {
+                                let (previous_piece, previous_piece_text) =
+                                    board.query_board(previous_coords.0, previous_coords.1);
+                                board.pieces[previous_coords.0][previous_coords.1];
 
-                                let previously_selected_piece = board.pieces
-                                    [previously_selected_coords.0][previously_selected_coords.1];
-                                let previous_piece_checker_index = (previously_selected_piece.file
-                                    + previously_selected_piece.rank)
-                                    % 2;
-                                let previous_piece_text = if previous_piece_checker_index == 0 {
-                                    previously_selected_piece.get_symbol().to_string()
-                                } else {
-                                    previously_selected_piece
-                                        .get_symbol()
-                                        .on(crossterm::style::Color::AnsiValue(237))
-                                        .to_string()
-                                };
-
-                                current_screen
-                                    .screen_rows
-                                    .clear_row(InsertVerticalPosition::Bottom);
-                                current_screen.screen_rows.edit_single_row(Text::Plain(
-                                    PlainText::new(
-                                        format!(
-                                            "Previous: {:?}, previous coords: {:?} current coords: {:?}",
-                                            previously_selected_piece.symbol,
-                                            previously_selected_coords,
-                                            (cursor_y, cursor_x/2)
-                                        ),
-                                        current_screen.width,
-                                        current_screen.height,
-                                        InsertHorizontalPosition::Exact(0),
-                                        InsertVerticalPosition::Bottom,
-                                    ),
-                                ));
                                 current_screen.screen_rows.edit_single_row(Text::new(
                                     previous_piece_text,
-                                    previously_selected_coords.1 * 2,
-                                    previously_selected_coords.0,
+                                    previous_piece.file * 2,
+                                    previous_piece.rank,
                                     Some("click_piece"),
                                 ));
-                            } else {
+
+                                let previous_moves = previous_piece.possible_moves();
+                                for tile in previous_moves {
+                                    let (piece, piece_text) = board.query_board(tile.0, tile.1);
+
+                                    current_screen.screen_rows.edit_single_row(Text::new(
+                                        piece_text,
+                                        tile.1 * 2,
+                                        tile.0,
+                                        Some("click_piece"),
+                                    ));
+                                }
+                            }
+
+                            current_screen.screen_rows.edit_single_row(Text::new(
+                                piece_text,
+                                cursor_x,
+                                cursor_y,
+                                Some("click_piece"),
+                            ));
+
+                            let piece_moves = piece.possible_moves();
+
+                            /* current_screen
+                                .screen_rows
+                                .clear_row(InsertVerticalPosition::Bottom);
+                            current_screen.screen_rows.edit_single_row(Text::Plain(
+                                PlainText::new(
+                                    format!("Piece moves: {:?}", piece_moves),
+                                    current_screen.width,
+                                    current_screen.height,
+                                    InsertHorizontalPosition::Exact(0),
+                                    InsertVerticalPosition::Bottom,
+                                ),
+                            )); */
+
+                            for tile in piece_moves {
+                                let piece = board.pieces[tile.0][tile.1];
+                                let piece_text = piece.get_symbol().on_dark_green().to_string();
                                 current_screen.screen_rows.edit_single_row(Text::new(
                                     piece_text,
-                                    cursor_x,
-                                    cursor_y,
+                                    tile.1 * 2,
+                                    tile.0,
                                     Some("click_piece"),
                                 ));
                             }
+
                             board.set_selected(cursor_y, cursor_x / 2);
                         }
                     }

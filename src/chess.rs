@@ -12,7 +12,9 @@ pub struct Board {
 impl Board {
     pub fn new() -> Self {
         Self {
-            pieces: Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+            pieces: Board::from_fen(
+                "rnbqkbnr/pppppppp/8/rnbqkbp1/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            ),
             selected_piece: None,
         }
     }
@@ -86,10 +88,18 @@ impl Board {
         *self
     }
 
-    
     pub fn query_board(&self, rank: usize, file: usize) -> (Piece, String) {
         let piece = self.pieces[rank][file];
-        let piece_text = 
+        let piece_checker = (rank + file) % 2;
+        let piece_text = if piece_checker == 0 {
+            piece.get_symbol()
+        } else {
+            piece
+                .get_symbol()
+                .on(crossterm::style::Color::AnsiValue(237))
+                .to_string()
+        };
+        (piece, piece_text)
     }
 }
 
@@ -181,12 +191,97 @@ impl Piece {
 
                 moves
             }
-            _ => {
+            ChessPieces::Bishop => {
+                let mut moves = vec![];
+
+                for i in -8_i32..8 {
+                    let move_x = self.file as i32 + i;
+                    let move_y_1 = self.rank as i32 + i;
+                    let move_y_2 = self.rank as i32 - i;
+                    if move_x >= 0
+                        && move_y_1 >= 0
+                        && move_x < 8
+                        && move_y_1 < 8
+                        && move_x != self.file as i32
+                    {
+                        moves.push((move_y_1 as usize, move_x as usize));
+                    }
+                    if move_x >= 0
+                        && move_y_2 >= 0
+                        && move_x < 8
+                        && move_y_2 < 8
+                        && move_x != self.file as i32
+                    {
+                        moves.push((move_y_2 as usize, move_x as usize));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Queen => {
+                let mut moves = vec![];
+
+                for i in 0..8 {
+                    if i != self.file {
+                        moves.push((self.rank, i));
+                    }
+                    if i != self.rank {
+                        moves.push((i, self.file));
+                    }
+                }
+
+                for i in -8_i32..8 {
+                    let move_x = self.file as i32 + i;
+                    let move_y_1 = self.rank as i32 + i;
+                    let move_y_2 = self.rank as i32 - i;
+                    if move_x >= 0
+                        && move_y_1 >= 0
+                        && move_x < 8
+                        && move_y_1 < 8
+                        && move_x != self.file as i32
+                    {
+                        moves.push((move_y_1 as usize, move_x as usize));
+                    }
+                    if move_x >= 0
+                        && move_y_2 >= 0
+                        && move_x < 8
+                        && move_y_2 < 8
+                        && move_x != self.file as i32
+                    {
+                        moves.push((move_y_2 as usize, move_x as usize));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::King => {
+                let mut moves = vec![];
+                let mut offsets = vec![];
+                offsets.push((-1, -1));
+                offsets.push((-1, 0));
+                offsets.push((-1, 1));
+
+                offsets.push((1, -1));
+                offsets.push((1, 0));
+                offsets.push((1, 1));
+
+                offsets.push((0, 1));
+                offsets.push((0, -1));
+
+                for (off_x, off_y) in offsets {
+                    let file = self.file as i32 + off_x;
+                    let rank = self.rank as i32 + off_y;
+                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
+                        moves.push((rank as usize, file as usize));
+                    }
+                }
+                moves
+            }
+            ChessPieces::None => {
                 vec![]
             }
         }
     }
-
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
