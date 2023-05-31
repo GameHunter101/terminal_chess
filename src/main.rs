@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let height = height as usize;
     let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
     let mut initial_screen = Screen::new(button_map, None);
-    initial_screen.screen_rows.edit_multiple_rows(
+    /* initial_screen.screen_rows.edit_multiple_rows(
         &PlainText::from_multi_lines(
 r#" _______                       __               __      ______ __                      
 |_     _|.-----.----.--------.|__|.-----.---.-.|  |    |      |  |--.-----.-----.-----.
@@ -33,7 +33,7 @@ r#" _______                       __               __      ______ __
         ),
         0,
         screen::InsertVerticalPosition::Exact(3),
-    );
+    ); */
 
     initial_screen
         .screen_rows

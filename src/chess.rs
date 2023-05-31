@@ -15,7 +15,7 @@ impl Board {
     pub fn new() -> Self {
         Self {
             pieces: Board::from_fen(
-                "rnbqkbnr/pppppppp/7P/rnbqkbp1/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "rnbqkbnr/pppppppp/7P/knbqr3/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
         }
@@ -107,6 +107,69 @@ impl Board {
         (piece, piece_text)
     }
 
+    pub fn closest_tile_left(&self, rank: usize, file: usize) -> usize {
+        let piece_rank = self.pieces[rank];
+
+        let mut whole_rank_left = &mut piece_rank.clone()[..file];
+        whole_rank_left.reverse();
+        let mut dist_left = whole_rank_left.len();
+        for (dist, piece) in whole_rank_left.iter().enumerate() {
+            if piece.symbol != ChessPieces::None {
+                dist_left = dist;
+                break;
+            }
+        }
+		let last_piece = whole_rank_left[dist_left];
+		
+
+        dist_left
+    }
+
+    pub fn closest_tile_right(&self, rank: usize, file: usize) -> usize {
+        let piece_rank = self.pieces[rank];
+
+        let mut whole_rank_right = &mut piece_rank.clone()[file + 1..];
+        let mut dist_right = whole_rank_right.len();
+        for (dist, piece) in whole_rank_right.iter().enumerate() {
+            if piece.symbol != ChessPieces::None {
+                dist_right = dist;
+                break;
+            }
+        }
+
+        dist_right
+    }
+    pub fn closest_tile_up(&self, rank: usize, file: usize) -> usize {
+        let piece_file = self.pieces.map(|rank| rank[file]);
+
+        let mut whole_file_up = &mut piece_file.clone()[..rank];
+        whole_file_up.reverse();
+        let mut dist_up = whole_file_up.len();
+        for (dist, piece) in whole_file_up.iter().enumerate() {
+            if piece.symbol != ChessPieces::None {
+                dist_up = dist;
+                break;
+            }
+        }
+
+        dist_up
+    }
+
+    pub fn closest_tile_down(&self, rank: usize, file: usize) -> usize {
+        let piece_file = self.pieces.map(|rank| rank[file]);
+
+        let mut whole_file_up = &mut piece_file.clone()[rank + 1..];
+        let mut dist_up = whole_file_up.len();
+        for (dist, piece) in whole_file_up.iter().enumerate() {
+            if piece.symbol != ChessPieces::None {
+                dist_up = dist;
+                break;
+            }
+        }
+
+        dist_up
+    }
+
     pub fn possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
         match origin_piece.symbol {
             ChessPieces::Pawn => {
@@ -118,22 +181,26 @@ impl Board {
                         moves.push((origin_piece.rank - 2, origin_piece.file));
                     }
 
-                    if origin_piece.rank > 0 && origin_piece.file > 0 && origin_piece.file < 7 {
-                        let query_left_diagonal_tile = self
-                            .query_board(origin_piece.rank - 1, origin_piece.file - 1)
-                            .0;
-                        let query_right_diagonal_tile = self
-                            .query_board(origin_piece.rank - 1, origin_piece.file + 1)
-                            .0;
-                        if query_left_diagonal_tile.symbol != ChessPieces::None
-                            && query_left_diagonal_tile.white != origin_piece.white
-                        {
-                            moves.push((origin_piece.rank - 1 as usize, origin_piece.file - 1));
+                    if origin_piece.rank > 0 {
+                        if origin_piece.file > 0 {
+                            let query_left_diagonal_tile = self
+                                .query_board(origin_piece.rank - 1, origin_piece.file - 1)
+                                .0;
+                            if query_left_diagonal_tile.white != origin_piece.white
+                                && query_left_diagonal_tile.symbol != ChessPieces::None
+                            {
+                                moves.push((origin_piece.rank - 1, origin_piece.file - 1));
+                            }
                         }
-                        if query_right_diagonal_tile.symbol != ChessPieces::None
-                            && query_left_diagonal_tile.white != origin_piece.white
-                        {
-                            moves.push((origin_piece.rank - 1 as usize, origin_piece.file + 1));
+                        if origin_piece.file < 7 {
+                            let query_right_diagonal_tile = self
+                                .query_board(origin_piece.rank - 1, origin_piece.file + 1)
+                                .0;
+                            if query_right_diagonal_tile.white != origin_piece.white
+                                && query_right_diagonal_tile.symbol != ChessPieces::None
+                            {
+                                moves.push((origin_piece.rank - 1, origin_piece.file + 1));
+                            }
                         }
                     }
                 } else {
@@ -142,22 +209,26 @@ impl Board {
                         moves.push((origin_piece.rank + 2, origin_piece.file));
                     }
 
-                    if origin_piece.rank > 0 && origin_piece.file > 0 && origin_piece.file < 7 {
-                        let query_left_diagonal_tile = self
-                            .query_board(origin_piece.rank + 1, origin_piece.file - 1)
-                            .0;
-                        let query_right_diagonal_tile = self
-                            .query_board(origin_piece.rank + 1, origin_piece.file + 1)
-                            .0;
-                        if query_left_diagonal_tile.symbol != ChessPieces::None
-                            && query_left_diagonal_tile.white != origin_piece.white
-                        {
-                            moves.push((origin_piece.rank + 1 as usize, origin_piece.file - 1));
+                    if origin_piece.rank < 7 {
+                        if origin_piece.file > 0 {
+                            let query_left_diagonal_tile = self
+                                .query_board(origin_piece.rank + 1, origin_piece.file - 1)
+                                .0;
+                            if query_left_diagonal_tile.white != origin_piece.white
+                                && query_left_diagonal_tile.symbol != ChessPieces::None
+                            {
+                                moves.push((origin_piece.rank + 1, origin_piece.file - 1));
+                            }
                         }
-                        if query_right_diagonal_tile.symbol != ChessPieces::None
-                            && query_left_diagonal_tile.white != origin_piece.white
-                        {
-                            moves.push((origin_piece.rank + 1 as usize, origin_piece.file + 1));
+                        if origin_piece.file < 7 {
+                            let query_right_diagonal_tile = self
+                                .query_board(origin_piece.rank + 1, origin_piece.file + 1)
+                                .0;
+                            if query_right_diagonal_tile.white != origin_piece.white
+                                && query_right_diagonal_tile.symbol != ChessPieces::None
+                            {
+                                moves.push((origin_piece.rank + 1, origin_piece.file + 1));
+                            }
                         }
                     }
                 }
@@ -167,14 +238,35 @@ impl Board {
             ChessPieces::Rook => {
                 let mut moves = vec![];
 
-                for i in 0..8 {
-                    if i != origin_piece.file {
-                        moves.push((origin_piece.rank, i));
-                    }
-                    if i != origin_piece.rank {
-                        moves.push((i, origin_piece.file));
-                    }
+                let dist_left = self.closest_tile_left(origin_piece.rank, origin_piece.file);
+                let dist_right = self.closest_tile_right(origin_piece.rank, origin_piece.file);
+                let dist_up = self.closest_tile_up(origin_piece.rank, origin_piece.file);
+                let dist_down = self.closest_tile_down(origin_piece.rank, origin_piece.file);
+
+                for i in 0..dist_left {
+                    moves.push((origin_piece.rank, origin_piece.file - i - 1));
                 }
+
+                for i in 0..dist_right {
+                    moves.push((origin_piece.rank, origin_piece.file + i + 1));
+                }
+
+                for i in 0..dist_up {
+                    moves.push((origin_piece.rank - i - 1, origin_piece.file));
+                }
+
+				for i in 0..dist_down {
+                    moves.push((origin_piece.rank + i + 1, origin_piece.file));
+                }
+
+                // for i in 0..8 {
+                //     if i != origin_piece.file {
+                //         moves.push((origin_piece.rank, i));
+                //     }
+                //     if i != origin_piece.rank {
+                //         moves.push((i, origin_piece.file));
+                //     }
+                // }
 
                 moves
             }
@@ -231,13 +323,25 @@ impl Board {
             ChessPieces::Queen => {
                 let mut moves = vec![];
 
-                for i in 0..8 {
-                    if i != origin_piece.file {
-                        moves.push((origin_piece.rank, i));
-                    }
-                    if i != origin_piece.rank {
-                        moves.push((i, origin_piece.file));
-                    }
+                let dist_left = self.closest_tile_left(origin_piece.rank, origin_piece.file);
+                let dist_right = self.closest_tile_right(origin_piece.rank, origin_piece.file);
+                let dist_up = self.closest_tile_up(origin_piece.rank, origin_piece.file);
+                let dist_down = self.closest_tile_down(origin_piece.rank, origin_piece.file);
+
+                for i in 0..dist_left {
+                    moves.push((origin_piece.rank, origin_piece.file - i - 1));
+                }
+
+                for i in 0..dist_right {
+                    moves.push((origin_piece.rank, origin_piece.file + i + 1));
+                }
+
+                for i in 0..dist_up {
+                    moves.push((origin_piece.rank - i - 1, origin_piece.file));
+                }
+
+				for i in 0..dist_down {
+                    moves.push((origin_piece.rank + i + 1, origin_piece.file));
                 }
 
                 for i in -8_i32..8 {
@@ -294,17 +398,16 @@ impl Board {
     }
 
     pub fn filter_possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
-        let mut filtered_moves = vec![];
+        // let mut filtered_moves = vec![];
         let possible_moves = self.possible_moves(origin_piece);
-        for tile in possible_moves {
+        /* for tile in possible_moves {
             let piece = self.query_board(tile.0, tile.1).0;
-            if piece.symbol == ChessPieces::None ||
-            piece.white != origin_piece.white
-            {
+            if piece.symbol == ChessPieces::None || piece.white != origin_piece.white {
                 filtered_moves.push(tile);
             }
         }
-        filtered_moves
+        filtered_moves */
+        possible_moves
     }
 }
 
