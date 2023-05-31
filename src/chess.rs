@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crossterm::style::Stylize;
 use crossterm::terminal;
 
@@ -13,7 +15,7 @@ impl Board {
     pub fn new() -> Self {
         Self {
             pieces: Board::from_fen(
-                "rnbqkbnr/pppppppp/8/rnbqkbp1/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "rnbqkbnr/pppppppp/7P/rnbqkbp1/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
         }
@@ -26,24 +28,27 @@ impl Board {
         let mut final_board = [[Piece::none(); 8]; 8];
         for (rank_index, line) in lines.enumerate() {
             let mut rank: [Piece; 8] = [Piece::none(); 8];
-            for (file_index, char) in line.chars().enumerate() {
+            let mut new_line: String = line.to_string();
+            for (i, char) in line.char_indices() {
                 if let Some(blank_count) = char.to_digit(10) {
-                    for i in 0..blank_count {
-                        rank[file_index + i as usize] = Piece {
-                            symbol: ChessPieces::None,
-                            file: file_index + i as usize,
-                            rank: rank_index,
-                            white: true,
-                        };
-                    }
-                } else {
-                    rank[file_index] = Piece {
-                        symbol: ChessPieces::from_fen(char),
-                        file: file_index,
-                        rank: rank_index,
-                        white: char.is_uppercase(),
-                    };
+                    let split = line.split_at(i);
+                    new_line = split.0.to_string();
+                    new_line.push_str(&"T".repeat(blank_count as usize));
+                    let end_line: String = split.1.chars().collect::<Vec<char>>()[1..]
+                        .iter()
+                        .map(|c| c.to_string())
+                        .collect();
+                    new_line.push_str(&end_line);
                 }
+            }
+
+            for (file_index, char) in new_line.char_indices() {
+                rank[file_index] = Piece {
+                    symbol: ChessPieces::from_fen(char),
+                    file: file_index,
+                    rank: rank_index,
+                    white: char.is_uppercase(),
+                };
             }
             final_board[rank_index] = rank;
         }
@@ -101,6 +106,206 @@ impl Board {
         };
         (piece, piece_text)
     }
+
+    pub fn possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
+        match origin_piece.symbol {
+            ChessPieces::Pawn => {
+                let mut moves = vec![];
+
+                if origin_piece.white {
+                    moves.push((origin_piece.rank - 1, origin_piece.file));
+                    if origin_piece.rank == 6 {
+                        moves.push((origin_piece.rank - 2, origin_piece.file));
+                    }
+
+                    if origin_piece.rank > 0 && origin_piece.file > 0 && origin_piece.file < 7 {
+                        let query_left_diagonal_tile = self
+                            .query_board(origin_piece.rank - 1, origin_piece.file - 1)
+                            .0;
+                        let query_right_diagonal_tile = self
+                            .query_board(origin_piece.rank - 1, origin_piece.file + 1)
+                            .0;
+                        if query_left_diagonal_tile.symbol != ChessPieces::None
+                            && query_left_diagonal_tile.white != origin_piece.white
+                        {
+                            moves.push((origin_piece.rank - 1 as usize, origin_piece.file - 1));
+                        }
+                        if query_right_diagonal_tile.symbol != ChessPieces::None
+                            && query_left_diagonal_tile.white != origin_piece.white
+                        {
+                            moves.push((origin_piece.rank - 1 as usize, origin_piece.file + 1));
+                        }
+                    }
+                } else {
+                    moves.push((origin_piece.rank + 1, origin_piece.file));
+                    if origin_piece.rank == 1 {
+                        moves.push((origin_piece.rank + 2, origin_piece.file));
+                    }
+
+                    if origin_piece.rank > 0 && origin_piece.file > 0 && origin_piece.file < 7 {
+                        let query_left_diagonal_tile = self
+                            .query_board(origin_piece.rank + 1, origin_piece.file - 1)
+                            .0;
+                        let query_right_diagonal_tile = self
+                            .query_board(origin_piece.rank + 1, origin_piece.file + 1)
+                            .0;
+                        if query_left_diagonal_tile.symbol != ChessPieces::None
+                            && query_left_diagonal_tile.white != origin_piece.white
+                        {
+                            moves.push((origin_piece.rank + 1 as usize, origin_piece.file - 1));
+                        }
+                        if query_right_diagonal_tile.symbol != ChessPieces::None
+                            && query_left_diagonal_tile.white != origin_piece.white
+                        {
+                            moves.push((origin_piece.rank + 1 as usize, origin_piece.file + 1));
+                        }
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Rook => {
+                let mut moves = vec![];
+
+                for i in 0..8 {
+                    if i != origin_piece.file {
+                        moves.push((origin_piece.rank, i));
+                    }
+                    if i != origin_piece.rank {
+                        moves.push((i, origin_piece.file));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Knight => {
+                let mut moves = vec![];
+                let mut offsets: Vec<(i32, i32)> = vec![];
+                offsets.push((2, 1));
+                offsets.push((2, -1));
+                offsets.push((-2, 1));
+                offsets.push((-2, -1));
+
+                offsets.push((1, 2));
+                offsets.push((1, -2));
+                offsets.push((-1, 2));
+                offsets.push((-1, -2));
+
+                for (off_x, off_y) in offsets {
+                    let file = origin_piece.file as i32 + off_x;
+                    let rank = origin_piece.rank as i32 + off_y;
+                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
+                        moves.push((rank as usize, file as usize));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Bishop => {
+                let mut moves = vec![];
+
+                for i in -8_i32..8 {
+                    let move_x = origin_piece.file as i32 + i;
+                    let move_y_1 = origin_piece.rank as i32 + i;
+                    let move_y_2 = origin_piece.rank as i32 - i;
+                    if move_x >= 0
+                        && move_y_1 >= 0
+                        && move_x < 8
+                        && move_y_1 < 8
+                        && move_x != origin_piece.file as i32
+                    {
+                        moves.push((move_y_1 as usize, move_x as usize));
+                    }
+                    if move_x >= 0
+                        && move_y_2 >= 0
+                        && move_x < 8
+                        && move_y_2 < 8
+                        && move_x != origin_piece.file as i32
+                    {
+                        moves.push((move_y_2 as usize, move_x as usize));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::Queen => {
+                let mut moves = vec![];
+
+                for i in 0..8 {
+                    if i != origin_piece.file {
+                        moves.push((origin_piece.rank, i));
+                    }
+                    if i != origin_piece.rank {
+                        moves.push((i, origin_piece.file));
+                    }
+                }
+
+                for i in -8_i32..8 {
+                    let move_x = origin_piece.file as i32 + i;
+                    let move_y_1 = origin_piece.rank as i32 + i;
+                    let move_y_2 = origin_piece.rank as i32 - i;
+                    if move_x >= 0
+                        && move_y_1 >= 0
+                        && move_x < 8
+                        && move_y_1 < 8
+                        && move_x != origin_piece.file as i32
+                    {
+                        moves.push((move_y_1 as usize, move_x as usize));
+                    }
+                    if move_x >= 0
+                        && move_y_2 >= 0
+                        && move_x < 8
+                        && move_y_2 < 8
+                        && move_x != origin_piece.file as i32
+                    {
+                        moves.push((move_y_2 as usize, move_x as usize));
+                    }
+                }
+
+                moves
+            }
+            ChessPieces::King => {
+                let mut moves = vec![];
+                let mut offsets = vec![];
+                offsets.push((-1, -1));
+                offsets.push((-1, 0));
+                offsets.push((-1, 1));
+
+                offsets.push((1, -1));
+                offsets.push((1, 0));
+                offsets.push((1, 1));
+
+                offsets.push((0, 1));
+                offsets.push((0, -1));
+
+                for (off_x, off_y) in offsets {
+                    let file = origin_piece.file as i32 + off_x;
+                    let rank = origin_piece.rank as i32 + off_y;
+                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
+                        moves.push((rank as usize, file as usize));
+                    }
+                }
+                moves
+            }
+            ChessPieces::None => {
+                vec![]
+            }
+        }
+    }
+
+    pub fn filter_possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
+        let mut filtered_moves = vec![];
+        let possible_moves = self.possible_moves(origin_piece);
+        for tile in possible_moves {
+            let piece = self.query_board(tile.0, tile.1).0;
+            if piece.symbol == ChessPieces::None ||
+            piece.white != origin_piece.white
+            {
+                filtered_moves.push(tile);
+            }
+        }
+        filtered_moves
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,154 +337,6 @@ impl Piece {
                 }
             }
             false => symbol.red().to_string(),
-        }
-    }
-
-    pub fn possible_moves(&self) -> Vec<(usize, usize)> {
-        match self.symbol {
-            ChessPieces::Pawn => {
-                let mut moves = vec![];
-
-                if self.white {
-                    moves.push((self.rank - 1, self.file));
-                    if self.rank == 6 {
-                        moves.push((self.rank - 2, self.file));
-                    }
-                } else {
-                    moves.push((self.rank + 1, self.file));
-                    if self.rank == 1 {
-                        moves.push((self.rank + 2, self.file));
-                    }
-                }
-
-                moves
-            }
-            ChessPieces::Rook => {
-                let mut moves = vec![];
-
-                for i in 0..8 {
-                    if i != self.file {
-                        moves.push((self.rank, i));
-                    }
-                    if i != self.rank {
-                        moves.push((i, self.file));
-                    }
-                }
-
-                moves
-            }
-            ChessPieces::Knight => {
-                let mut moves = vec![];
-                let mut offsets: Vec<(i32, i32)> = vec![];
-                offsets.push((2, 1));
-                offsets.push((2, -1));
-                offsets.push((-2, 1));
-                offsets.push((-2, -1));
-
-                offsets.push((1, 2));
-                offsets.push((1, -2));
-                offsets.push((-1, 2));
-                offsets.push((-1, -2));
-
-                for (off_x, off_y) in offsets {
-                    let file = self.file as i32 + off_x;
-                    let rank = self.rank as i32 + off_y;
-                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
-                        moves.push((rank as usize, file as usize));
-                    }
-                }
-
-                moves
-            }
-            ChessPieces::Bishop => {
-                let mut moves = vec![];
-
-                for i in -8_i32..8 {
-                    let move_x = self.file as i32 + i;
-                    let move_y_1 = self.rank as i32 + i;
-                    let move_y_2 = self.rank as i32 - i;
-                    if move_x >= 0
-                        && move_y_1 >= 0
-                        && move_x < 8
-                        && move_y_1 < 8
-                        && move_x != self.file as i32
-                    {
-                        moves.push((move_y_1 as usize, move_x as usize));
-                    }
-                    if move_x >= 0
-                        && move_y_2 >= 0
-                        && move_x < 8
-                        && move_y_2 < 8
-                        && move_x != self.file as i32
-                    {
-                        moves.push((move_y_2 as usize, move_x as usize));
-                    }
-                }
-
-                moves
-            }
-            ChessPieces::Queen => {
-                let mut moves = vec![];
-
-                for i in 0..8 {
-                    if i != self.file {
-                        moves.push((self.rank, i));
-                    }
-                    if i != self.rank {
-                        moves.push((i, self.file));
-                    }
-                }
-
-                for i in -8_i32..8 {
-                    let move_x = self.file as i32 + i;
-                    let move_y_1 = self.rank as i32 + i;
-                    let move_y_2 = self.rank as i32 - i;
-                    if move_x >= 0
-                        && move_y_1 >= 0
-                        && move_x < 8
-                        && move_y_1 < 8
-                        && move_x != self.file as i32
-                    {
-                        moves.push((move_y_1 as usize, move_x as usize));
-                    }
-                    if move_x >= 0
-                        && move_y_2 >= 0
-                        && move_x < 8
-                        && move_y_2 < 8
-                        && move_x != self.file as i32
-                    {
-                        moves.push((move_y_2 as usize, move_x as usize));
-                    }
-                }
-
-                moves
-            }
-            ChessPieces::King => {
-                let mut moves = vec![];
-                let mut offsets = vec![];
-                offsets.push((-1, -1));
-                offsets.push((-1, 0));
-                offsets.push((-1, 1));
-
-                offsets.push((1, -1));
-                offsets.push((1, 0));
-                offsets.push((1, 1));
-
-                offsets.push((0, 1));
-                offsets.push((0, -1));
-
-                for (off_x, off_y) in offsets {
-                    let file = self.file as i32 + off_x;
-                    let rank = self.rank as i32 + off_y;
-                    if file >= 0 && rank >= 0 && file < 8 && rank < 8 {
-                        moves.push((rank as usize, file as usize));
-                    }
-                }
-                moves
-            }
-            ChessPieces::None => {
-                vec![]
-            }
         }
     }
 }

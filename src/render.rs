@@ -18,6 +18,7 @@ pub struct Render {
     width: usize,
     height: usize,
     cursor_controller: CursorController,
+    previous_coords: Option<(usize, usize)>,
 }
 
 impl Render {
@@ -36,6 +37,7 @@ impl Render {
             width,
             height,
             cursor_controller: CursorController::new(width, height),
+            previous_coords: None,
         })
     }
 
@@ -64,7 +66,10 @@ impl Render {
                         if piece.symbol != ChessPieces::None {
                             let piece_text = piece.get_symbol().on_dark_yellow().to_string();
 
-                            if let Some(previous_coords) = board.selected_piece {
+                            if let Some(previous_coords) = self.previous_coords {
+                                if previous_coords == (cursor_y, cursor_x) {
+                                    println!("Clicked on same square");
+                                }
                                 let (previous_piece, previous_piece_text) =
                                     board.query_board(previous_coords.0, previous_coords.1);
                                 board.pieces[previous_coords.0][previous_coords.1];
@@ -73,10 +78,10 @@ impl Render {
                                     previous_piece_text,
                                     previous_piece.file * 2,
                                     previous_piece.rank,
-                                    Some("click_piece"),
+                                    None,
                                 ));
 
-                                let previous_moves = previous_piece.possible_moves();
+                                let previous_moves = board.filter_possible_moves(previous_piece);
                                 for tile in previous_moves {
                                     let (piece, piece_text) = board.query_board(tile.0, tile.1);
 
@@ -84,32 +89,29 @@ impl Render {
                                         piece_text,
                                         tile.1 * 2,
                                         tile.0,
-                                        Some("click_piece"),
+                                        None,
                                     ));
                                 }
                             }
 
-                            current_screen.screen_rows.edit_single_row(Text::new(
-                                piece_text,
-                                cursor_x,
-                                cursor_y,
-                                Some("click_piece"),
-                            ));
-
-                            let piece_moves = piece.possible_moves();
-
                             /* current_screen
+                                .screen_rows
+                                .edit_single_row(Text::new(piece_text, cursor_x, cursor_y, None));
+
+                            current_screen
                                 .screen_rows
                                 .clear_row(InsertVerticalPosition::Bottom);
                             current_screen.screen_rows.edit_single_row(Text::Plain(
                                 PlainText::new(
-                                    format!("Piece moves: {:?}", piece_moves),
-                                    current_screen.width,
-                                    current_screen.height,
+                                    format!("{:?}", self.previous_coords),
+                                    self.width,
+                                    self.height,
                                     InsertHorizontalPosition::Exact(0),
                                     InsertVerticalPosition::Bottom,
                                 ),
                             )); */
+
+                            let piece_moves = board.filter_possible_moves(piece);
 
                             for tile in piece_moves {
                                 let piece = board.pieces[tile.0][tile.1];
@@ -118,11 +120,11 @@ impl Render {
                                     piece_text,
                                     tile.1 * 2,
                                     tile.0,
-                                    Some("click_piece"),
+                                    None,
                                 ));
                             }
 
-                            board.set_selected(cursor_y, cursor_x / 2);
+                            self.previous_coords = Some((cursor_y, cursor_x / 2));
                         }
                     }
                     /* let piece = current_screen.screen_rows.rows[cursor_y][cursor_x].clone();
