@@ -15,7 +15,7 @@ impl Board {
     pub fn new() -> Self {
         Self {
             pieces: Board::from_fen(
-                "rnbqkbnr/pppppppp/7P/knbqr3/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "rnbqkbnr/pppppppp/7P/knbqrbp1/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
         }
@@ -107,7 +107,8 @@ impl Board {
         (piece, piece_text)
     }
 
-    pub fn closest_tile_left(&self, rank: usize, file: usize) -> usize {
+    pub fn closest_tile_left(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+        let mut left_moves = vec![];
         let piece_rank = self.pieces[rank];
 
         let mut whole_rank_left = &mut piece_rank.clone()[..file];
@@ -119,13 +120,22 @@ impl Board {
                 break;
             }
         }
-		let last_piece = whole_rank_left[dist_left];
-		
+        if whole_rank_left.len() > 0 && dist_left < whole_rank_left.len() {
+            let last_piece = whole_rank_left[dist_left];
+            if last_piece.white != white {
+                dist_left += 1;
+            }
+        }
 
-        dist_left
+        for i in 0..dist_left {
+            left_moves.push((rank, file - i - 1));
+        }
+
+        left_moves
     }
 
-    pub fn closest_tile_right(&self, rank: usize, file: usize) -> usize {
+    pub fn closest_tile_right(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+        let mut right_moves = vec![];
         let piece_rank = self.pieces[rank];
 
         let mut whole_rank_right = &mut piece_rank.clone()[file + 1..];
@@ -137,9 +147,21 @@ impl Board {
             }
         }
 
-        dist_right
+        if whole_rank_right.len() > 0 && dist_right < whole_rank_right.len() {
+            let last_piece = whole_rank_right[dist_right];
+            if last_piece.white != white {
+                dist_right += 1;
+            }
+        }
+
+        for i in 0..dist_right {
+            right_moves.push((rank, file + i + 1));
+        }
+
+        right_moves
     }
-    pub fn closest_tile_up(&self, rank: usize, file: usize) -> usize {
+    pub fn closest_tile_up(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+        let mut up_moves = vec![];
         let piece_file = self.pieces.map(|rank| rank[file]);
 
         let mut whole_file_up = &mut piece_file.clone()[..rank];
@@ -152,22 +174,149 @@ impl Board {
             }
         }
 
-        dist_up
+        if whole_file_up.len() > 0 && dist_up < whole_file_up.len() {
+            let last_piece = whole_file_up[dist_up];
+            if last_piece.white != white {
+                dist_up += 1;
+            }
+        }
+
+        for i in 0..dist_up {
+            up_moves.push((rank - i - 1, file));
+        }
+
+        up_moves
     }
 
-    pub fn closest_tile_down(&self, rank: usize, file: usize) -> usize {
+    pub fn closest_tile_down(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+        let mut down_moves = vec![];
         let piece_file = self.pieces.map(|rank| rank[file]);
 
-        let mut whole_file_up = &mut piece_file.clone()[rank + 1..];
-        let mut dist_up = whole_file_up.len();
-        for (dist, piece) in whole_file_up.iter().enumerate() {
+        let mut whole_file_down = &mut piece_file.clone()[rank + 1..];
+        let mut dist_down = whole_file_down.len();
+        for (dist, piece) in whole_file_down.iter().enumerate() {
             if piece.symbol != ChessPieces::None {
-                dist_up = dist;
+                dist_down = dist;
                 break;
             }
         }
 
-        dist_up
+        if whole_file_down.len() > 0 && dist_down < whole_file_down.len() {
+            let last_piece = whole_file_down[dist_down];
+            if last_piece.white != white {
+                dist_down += 1;
+            }
+        }
+
+        for i in 0..dist_down {
+            down_moves.push((rank + i + 1, file));
+        }
+
+        down_moves
+    }
+
+    pub fn piece_moves_diagonal_positive(
+        &self,
+        rank: usize,
+        file: usize,
+        white: bool,
+    ) -> Vec<(usize, usize)> {
+        let mut moves = vec![];
+        let mut diagonal_top: Vec<(usize, usize)> = vec![];
+        let mut diagonal_bottom: Vec<(usize, usize)> = vec![];
+        for (i, full_rank) in self.pieces.iter().enumerate() {
+            let offset = rank as i32 - i as i32;
+            let diagonal_file = file as i32 + offset;
+            if diagonal_file >= 0 && diagonal_file < 8 {
+                if i < rank {
+                    diagonal_top.push((i, diagonal_file as usize));
+                } else if i > rank {
+                    diagonal_bottom.push((i, diagonal_file as usize));
+                }
+            }
+        }
+
+        diagonal_top.reverse();
+        for tile in diagonal_top {
+            let query = self.query_board(tile.0, tile.1).0;
+            if query.symbol == ChessPieces::None {
+                moves.push(tile);
+            } else {
+                if query.white != white {
+                    moves.push(tile);
+                }
+                break;
+            }
+        }
+
+        for tile in diagonal_bottom {
+            let query = self.query_board(tile.0, tile.1).0;
+            dbg!(query.symbol);
+            if query.symbol == ChessPieces::None {
+                moves.push(tile);
+            } else {
+                if query.white != white {
+                    moves.push(tile);
+                }
+                break;
+            }
+        }
+        moves
+    }
+    pub fn piece_moves_diagonal_negative(
+        &self,
+        rank: usize,
+        file: usize,
+        white: bool,
+    ) -> Vec<(usize, usize)> {
+        let mut moves = vec![];
+        let mut diagonal_top: Vec<(usize, usize)> = vec![];
+        let mut diagonal_bottom: Vec<(usize, usize)> = vec![];
+
+        let offset = (file as i32 - 3) + (3 - rank as i32);
+        for (i, full_rank) in self.pieces.iter().enumerate() {
+            let tile_file = i as i32 + offset;
+            let tile_rank = i;
+            if tile_file >= 0 && tile_file < 8 {
+                // moves.push((tile_rank as usize, tile_file as usize));
+                if tile_rank < rank {
+                    diagonal_top.push((tile_rank as usize, tile_file as usize));
+                }
+                if tile_rank > rank {
+                    diagonal_bottom.push((tile_rank as usize, tile_file as usize));
+                }
+            }
+        }
+
+        // dbg!(diagonal_top, diagonal_bottom);
+        // panic!();
+
+        diagonal_top.reverse();
+        for tile in diagonal_top {
+            let query = self.query_board(tile.0, tile.1).0;
+            if query.symbol == ChessPieces::None {
+                moves.push(tile);
+            } else {
+                if query.white != white {
+                    moves.push(tile);
+                }
+                break;
+            }
+        }
+
+        for tile in diagonal_bottom {
+            let query = self.query_board(tile.0, tile.1).0;
+            if query.symbol == ChessPieces::None {
+                moves.push(tile);
+            } else {
+                if query.white != white {
+                    moves.push(tile);
+                }
+                break;
+            }
+        }
+
+        moves
     }
 
     pub fn possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
@@ -176,9 +325,17 @@ impl Board {
                 let mut moves = vec![];
 
                 if origin_piece.white {
-                    moves.push((origin_piece.rank - 1, origin_piece.file));
-                    if origin_piece.rank == 6 {
-                        moves.push((origin_piece.rank - 2, origin_piece.file));
+                    let query_front_tile =
+                        self.query_board(origin_piece.rank - 1, origin_piece.file).0;
+                    if query_front_tile.symbol == ChessPieces::None {
+                        moves.push((origin_piece.rank - 1, origin_piece.file));
+                        if origin_piece.rank == 6 {
+                            let query_far_front_tile =
+                                self.query_board(origin_piece.rank - 2, origin_piece.file).0;
+                            if query_far_front_tile.symbol == ChessPieces::None {
+                                moves.push((origin_piece.rank - 2, origin_piece.file));
+                            }
+                        }
                     }
 
                     if origin_piece.rank > 0 {
@@ -204,9 +361,17 @@ impl Board {
                         }
                     }
                 } else {
-                    moves.push((origin_piece.rank + 1, origin_piece.file));
-                    if origin_piece.rank == 1 {
-                        moves.push((origin_piece.rank + 2, origin_piece.file));
+                    let query_front_tile =
+                        self.query_board(origin_piece.rank + 1, origin_piece.file).0;
+                    if query_front_tile.symbol == ChessPieces::None {
+                        moves.push((origin_piece.rank + 1, origin_piece.file));
+                        if origin_piece.rank == 1 {
+                            let query_far_front_tile =
+                                self.query_board(origin_piece.rank + 2, origin_piece.file).0;
+                            if query_far_front_tile.symbol == ChessPieces::None {
+                                moves.push((origin_piece.rank + 2, origin_piece.file));
+                            }
+                        }
                     }
 
                     if origin_piece.rank < 7 {
@@ -238,35 +403,28 @@ impl Board {
             ChessPieces::Rook => {
                 let mut moves = vec![];
 
-                let dist_left = self.closest_tile_left(origin_piece.rank, origin_piece.file);
-                let dist_right = self.closest_tile_right(origin_piece.rank, origin_piece.file);
-                let dist_up = self.closest_tile_up(origin_piece.rank, origin_piece.file);
-                let dist_down = self.closest_tile_down(origin_piece.rank, origin_piece.file);
+                let mut left_moves = self.closest_tile_left(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut right_moves = self.closest_tile_right(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut up_moves =
+                    self.closest_tile_up(origin_piece.rank, origin_piece.file, origin_piece.white);
+                let mut down_moves = self.closest_tile_down(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
 
-                for i in 0..dist_left {
-                    moves.push((origin_piece.rank, origin_piece.file - i - 1));
-                }
-
-                for i in 0..dist_right {
-                    moves.push((origin_piece.rank, origin_piece.file + i + 1));
-                }
-
-                for i in 0..dist_up {
-                    moves.push((origin_piece.rank - i - 1, origin_piece.file));
-                }
-
-				for i in 0..dist_down {
-                    moves.push((origin_piece.rank + i + 1, origin_piece.file));
-                }
-
-                // for i in 0..8 {
-                //     if i != origin_piece.file {
-                //         moves.push((origin_piece.rank, i));
-                //     }
-                //     if i != origin_piece.rank {
-                //         moves.push((i, origin_piece.file));
-                //     }
-                // }
+                moves.append(&mut left_moves);
+                moves.append(&mut right_moves);
+                moves.append(&mut up_moves);
+                moves.append(&mut down_moves);
 
                 moves
             }
@@ -296,75 +454,61 @@ impl Board {
             ChessPieces::Bishop => {
                 let mut moves = vec![];
 
-                for i in -8_i32..8 {
-                    let move_x = origin_piece.file as i32 + i;
-                    let move_y_1 = origin_piece.rank as i32 + i;
-                    let move_y_2 = origin_piece.rank as i32 - i;
-                    if move_x >= 0
-                        && move_y_1 >= 0
-                        && move_x < 8
-                        && move_y_1 < 8
-                        && move_x != origin_piece.file as i32
-                    {
-                        moves.push((move_y_1 as usize, move_x as usize));
-                    }
-                    if move_x >= 0
-                        && move_y_2 >= 0
-                        && move_x < 8
-                        && move_y_2 < 8
-                        && move_x != origin_piece.file as i32
-                    {
-                        moves.push((move_y_2 as usize, move_x as usize));
-                    }
-                }
+                let mut moves_positive_diag = self.piece_moves_diagonal_positive(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut moves_negative_diag = self.piece_moves_diagonal_negative(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+
+                moves.append(&mut moves_positive_diag);
+                moves.append(&mut moves_negative_diag);
 
                 moves
             }
             ChessPieces::Queen => {
                 let mut moves = vec![];
 
-                let dist_left = self.closest_tile_left(origin_piece.rank, origin_piece.file);
-                let dist_right = self.closest_tile_right(origin_piece.rank, origin_piece.file);
-                let dist_up = self.closest_tile_up(origin_piece.rank, origin_piece.file);
-                let dist_down = self.closest_tile_down(origin_piece.rank, origin_piece.file);
+                let mut left_moves = self.closest_tile_left(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut right_moves = self.closest_tile_right(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut up_moves =
+                    self.closest_tile_up(origin_piece.rank, origin_piece.file, origin_piece.white);
+                let mut down_moves = self.closest_tile_down(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
 
-                for i in 0..dist_left {
-                    moves.push((origin_piece.rank, origin_piece.file - i - 1));
-                }
+                moves.append(&mut left_moves);
+                moves.append(&mut right_moves);
+                moves.append(&mut up_moves);
+                moves.append(&mut down_moves);
 
-                for i in 0..dist_right {
-                    moves.push((origin_piece.rank, origin_piece.file + i + 1));
-                }
+                let mut moves_positive_diag = self.piece_moves_diagonal_positive(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut moves_negative_diag = self.piece_moves_diagonal_negative(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
 
-                for i in 0..dist_up {
-                    moves.push((origin_piece.rank - i - 1, origin_piece.file));
-                }
-
-				for i in 0..dist_down {
-                    moves.push((origin_piece.rank + i + 1, origin_piece.file));
-                }
-
-                for i in -8_i32..8 {
-                    let move_x = origin_piece.file as i32 + i;
-                    let move_y_1 = origin_piece.rank as i32 + i;
-                    let move_y_2 = origin_piece.rank as i32 - i;
-                    if move_x >= 0
-                        && move_y_1 >= 0
-                        && move_x < 8
-                        && move_y_1 < 8
-                        && move_x != origin_piece.file as i32
-                    {
-                        moves.push((move_y_1 as usize, move_x as usize));
-                    }
-                    if move_x >= 0
-                        && move_y_2 >= 0
-                        && move_x < 8
-                        && move_y_2 < 8
-                        && move_x != origin_piece.file as i32
-                    {
-                        moves.push((move_y_2 as usize, move_x as usize));
-                    }
-                }
+                moves.append(&mut moves_positive_diag);
+                moves.append(&mut moves_negative_diag);
 
                 moves
             }
@@ -398,16 +542,15 @@ impl Board {
     }
 
     pub fn filter_possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
-        // let mut filtered_moves = vec![];
+        let mut filtered_moves = vec![];
         let possible_moves = self.possible_moves(origin_piece);
-        /* for tile in possible_moves {
+        for tile in possible_moves {
             let piece = self.query_board(tile.0, tile.1).0;
             if piece.symbol == ChessPieces::None || piece.white != origin_piece.white {
                 filtered_moves.push(tile);
             }
         }
-        filtered_moves */
-        possible_moves
+        filtered_moves
     }
 }
 
