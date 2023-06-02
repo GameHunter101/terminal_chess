@@ -54,7 +54,13 @@ r#" _______                       __               __      ______ __
 
     let mut game_screen = Screen::new(game_button_map, Some(chess_game));
 
-    chess_game.display_board(&mut game_screen);
+    let board_rows = chess_game.display_board(false);
+
+	for row in board_rows {
+            for piece in row {
+                game_screen.screen_rows.edit_single_row(piece);
+            }
+	}
 
     game_screen
         .screen_rows

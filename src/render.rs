@@ -6,7 +6,7 @@ use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
 use rand::Rng;
 use regex::Regex;
 
-use crate::chess::ChessPieces;
+use crate::chess::{Board, ChessPieces};
 use crate::screen::{
     ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, ScreenRows,
     Text, TextContent,
@@ -18,7 +18,6 @@ pub struct Render {
     width: usize,
     height: usize,
     cursor_controller: CursorController,
-    previous_coords: Option<(usize, usize)>,
 }
 
 impl Render {
@@ -37,7 +36,6 @@ impl Render {
             width,
             height,
             cursor_controller: CursorController::new(width, height),
-            previous_coords: None,
         })
     }
 
@@ -54,90 +52,68 @@ impl Render {
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
         let current_screen = &mut self.screens[self.current_screen];
+        if let Some(board) = &mut current_screen.game {
+            if cursor_x < 16 && cursor_y < 8 {
+                let board_rows = board.display_board(true);
+
+                for row in board_rows {
+                    for piece in row {
+                        current_screen.screen_rows.edit_single_row(piece);
+                    }
+                }
+
+                let piece = board.query_board(cursor_y, cursor_x / 2).0;
+                let previous_piece = if let Some(prev) = board.selected_piece {
+                    Some(board.query_board(prev.0, prev.1).0)
+                } else {
+                    None
+                };
+
+                let piece_moves = board.filter_possible_moves(piece);
+
+                for tile in piece_moves {
+                    let piece = board.pieces[tile.0][tile.1];
+                    let piece_text = piece.get_symbol().on_dark_green().to_string();
+                    current_screen.screen_rows.edit_single_row(Text::new(
+                        piece_text,
+                        tile.1 * 2,
+                        tile.0,
+                        None,
+                    ));
+                }
+                if piece.symbol != ChessPieces::None {
+                    board.moving = true;
+                }
+
+                if let Some(previous_piece) = previous_piece {
+                    let previous_moves = board.possible_moves(previous_piece);
+                    if previous_moves.contains(&(cursor_y, cursor_x / 2)) {
+                        board.move_piece(previous_piece, cursor_y, cursor_x / 2);
+
+                        let board_rows = board.display_board(true);
+
+                        for row in board_rows {
+                            for piece in row {
+                                current_screen.screen_rows.edit_single_row(piece);
+                            }
+                        }
+                    }
+                }
+
+                board.set_selected(cursor_y, cursor_x / 2);
+            }
+        }
         for button in current_screen.screen_rows.buttons[cursor_y].clone() {
             if button.position_x <= cursor_x && button.position_x + button.length > cursor_x {
                 if button.on_click == "next_screen" {
                     self.current_screen += 1;
                 } else if button.on_click == "last_screen" {
                     self.current_screen -= 1;
-                } else if button.on_click == "click_piece" {
-                    if let Some(board) = &mut current_screen.game {
-                        let piece = board.query_board(cursor_y, cursor_x / 2).0;
-                        if piece.symbol != ChessPieces::None {
-                            let piece_text = piece.get_symbol().on_dark_yellow().to_string();
+                }
+                /* else if button.on_click == "click_piece" {
 
-                            if let Some(previous_coords) = self.previous_coords {
-                                if previous_coords == (cursor_y, cursor_x) {
-                                    println!("Clicked on same square");
-                                }
-                                let (previous_piece, previous_piece_text) =
-                                    board.query_board(previous_coords.0, previous_coords.1);
-                                board.pieces[previous_coords.0][previous_coords.1];
-
-                                current_screen.screen_rows.edit_single_row(Text::new(
-                                    previous_piece_text,
-                                    previous_piece.file * 2,
-                                    previous_piece.rank,
-                                    None,
-                                ));
-
-                                let previous_moves = board.filter_possible_moves(previous_piece);
-                                for tile in previous_moves {
-                                    let (piece, piece_text) = board.query_board(tile.0, tile.1);
-
-                                    current_screen.screen_rows.edit_single_row(Text::new(
-                                        piece_text,
-                                        tile.1 * 2,
-                                        tile.0,
-                                        None,
-                                    ));
-                                }
-                            }
-
-                            /* current_screen
-                                .screen_rows
-                                .edit_single_row(Text::new(piece_text, cursor_x, cursor_y, None));
-
-                            current_screen
-                                .screen_rows
-                                .clear_row(InsertVerticalPosition::Bottom);
-                            current_screen.screen_rows.edit_single_row(Text::Plain(
-                                PlainText::new(
-                                    format!("{:?}", self.previous_coords),
-                                    self.width,
-                                    self.height,
-                                    InsertHorizontalPosition::Exact(0),
-                                    InsertVerticalPosition::Bottom,
-                                ),
-                            )); */
-
-                            let piece_moves = board.filter_possible_moves(piece);
-
-                            for tile in piece_moves {
-                                let piece = board.pieces[tile.0][tile.1];
-                                let piece_text = piece.get_symbol().on_dark_green().to_string();
-                                current_screen.screen_rows.edit_single_row(Text::new(
-                                    piece_text,
-                                    tile.1 * 2,
-                                    tile.0,
-                                    None,
-                                ));
-                            }
-
-                            self.previous_coords = Some((cursor_y, cursor_x / 2));
-                        }
-                    }
-                    /* let piece = current_screen.screen_rows.rows[cursor_y][cursor_x].clone();
-
-
-                    current_screen.screen_rows.edit_single_row(Text::new(
-                        piece/* .with(color).on_yellow() */.to_string(),
-                        /* piece.on(crossterm::style::Color::Reset).with(crossterm::style::Color::Reset)/* .on_dark_yellow() */.to_string(), */
-                        cursor_x,
-                        cursor_y,
-                        Some("click_piece"),
-                    )); */
-                } else {
+                }  */
+                else {
                     let on_click = current_screen
                         .button_map
                         .get_key_value(button.on_click)

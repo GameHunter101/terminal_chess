@@ -337,7 +337,7 @@ impl std::default::Default for PlainText {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ButtonText {
     pub text: String,
     pub position_x: usize,

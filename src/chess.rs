@@ -9,6 +9,7 @@ use crate::screen::{self, ButtonText, PlainText, Screen, Text, TextContent};
 pub struct Board {
     pub pieces: [[Piece; 8]; 8],
     pub selected_piece: Option<(usize, usize)>,
+	pub moving: bool,
 }
 
 impl Board {
@@ -18,6 +19,7 @@ impl Board {
                 "rnbqkbnr/pppppppp/7P/knbqrbp1/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
+			moving: false,
         }
     }
 
@@ -55,7 +57,7 @@ impl Board {
         final_board
     }
 
-    pub fn display_board(&self, screen: &mut Screen) {
+    pub fn display_board(&self, refresh: bool) -> Vec<Vec<Text>> {
         let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
 
         for (rank_index, rank) in self.pieces.iter().enumerate() {
@@ -70,22 +72,32 @@ impl Board {
                         .to_string()
                 };
 
-                board_rows[rank_index].push(Text::Button(ButtonText::new(
+                board_rows[rank_index].push(Text::new(
+					piece_text,
+					file_index*2,
+					rank_index,
+					None,
+					/* if refresh {None} else {
+						Some("click_piece")
+					} */
+				));/* ::new(
                     piece_text,
                     screen.width,
                     screen.height,
                     screen::InsertHorizontalPosition::Exact(file_index * 2),
                     screen::InsertVerticalPosition::Exact(rank_index),
                     "click_piece",
-                )));
+                ))); */
             }
         }
 
-        for row in board_rows {
+		board_rows
+
+        /* for row in board_rows {
             for piece in row {
                 screen.screen_rows.edit_single_row(piece);
             }
-        }
+        } */
     }
 
     pub fn set_selected(&mut self, rank: usize, file: usize) -> Self {
@@ -251,7 +263,6 @@ impl Board {
 
         for tile in diagonal_bottom {
             let query = self.query_board(tile.0, tile.1).0;
-            dbg!(query.symbol);
             if query.symbol == ChessPieces::None {
                 moves.push(tile);
             } else {
@@ -278,7 +289,6 @@ impl Board {
             let tile_file = i as i32 + offset;
             let tile_rank = i;
             if tile_file >= 0 && tile_file < 8 {
-                // moves.push((tile_rank as usize, tile_file as usize));
                 if tile_rank < rank {
                     diagonal_top.push((tile_rank as usize, tile_file as usize));
                 }
@@ -287,9 +297,6 @@ impl Board {
                 }
             }
         }
-
-        // dbg!(diagonal_top, diagonal_bottom);
-        // panic!();
 
         diagonal_top.reverse();
         for tile in diagonal_top {
@@ -551,6 +558,29 @@ impl Board {
             }
         }
         filtered_moves
+    }
+
+    pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize/* , screen: &mut Screen */) {
+        let possible_moves = self.filter_possible_moves(piece);
+        if possible_moves.contains(&(new_rank, new_file)) {
+            let old_rank = piece.rank;
+            let old_file = piece.file;
+			let moved_piece = Piece {
+				symbol: piece.symbol,
+				rank: new_rank,
+				file: new_file,
+				white: piece.white,
+			};
+            self.pieces[new_rank][new_file] = moved_piece;
+            self.pieces[old_rank][old_file] = Piece {
+                symbol: ChessPieces::None,
+                rank: old_rank,
+                file: old_file,
+                white: true,
+            };
+			self.moving = false;
+			// self.display_board(screen);
+        }
     }
 }
 
