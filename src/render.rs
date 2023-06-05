@@ -62,45 +62,47 @@ impl Render {
                     }
                 }
 
-                let piece = board.query_board(cursor_y, cursor_x / 2).0;
-                let previous_piece = if let Some(prev) = board.selected_piece {
-                    Some(board.query_board(prev.0, prev.1).0)
-                } else {
-                    None
-                };
+                let piece = board.query_board_with_color(cursor_y, cursor_x / 2);
+                match piece {
+                    Some(piece) => {
+                        let previous_piece = if let Some(prev) = board.selected_piece {
+                            Some(board.query_board(prev.0, prev.1).0)
+                        } else {
+                            None
+                        };
 
-                let piece_moves = board.filter_possible_moves(piece);
+                        let piece_moves = board.filter_possible_moves(piece);
 
-                for tile in piece_moves {
-                    let piece = board.pieces[tile.0][tile.1];
-                    let piece_text = piece.get_symbol().on_dark_green().to_string();
-                    current_screen.screen_rows.edit_single_row(Text::new(
-                        piece_text,
-                        tile.1 * 2,
-                        tile.0,
-                        None,
-                    ));
-                }
-                if piece.symbol != ChessPieces::None {
-                    board.moving = true;
-                }
+                        for tile in piece_moves {
+                            let piece = board.pieces[tile.0][tile.1];
+                            let piece_text = piece.get_symbol().on_dark_green().to_string();
+                            current_screen.screen_rows.edit_single_row(Text::new(
+                                piece_text,
+                                tile.1 * 2,
+                                tile.0,
+                                None,
+                            ));
+                        }
 
-                if let Some(previous_piece) = previous_piece {
-                    let previous_moves = board.possible_moves(previous_piece);
-                    if previous_moves.contains(&(cursor_y, cursor_x / 2)) {
-                        board.move_piece(previous_piece, cursor_y, cursor_x / 2);
+                        if let Some(previous_piece) = previous_piece {
+                            let previous_moves = board.possible_moves(previous_piece);
+                            if previous_moves.contains(&(cursor_y, cursor_x / 2)) {
+                                board.move_piece(previous_piece, cursor_y, cursor_x / 2);
 
-                        let board_rows = board.display_board(true);
+                                let board_rows = board.display_board(true);
 
-                        for row in board_rows {
-                            for piece in row {
-                                current_screen.screen_rows.edit_single_row(piece);
+                                for row in board_rows {
+                                    for piece in row {
+                                        current_screen.screen_rows.edit_single_row(piece);
+                                    }
+                                }
                             }
                         }
-                    }
-                }
 
-                board.set_selected(cursor_y, cursor_x / 2);
+                        board.set_selected(cursor_y, cursor_x / 2);
+                    }
+                    None => {}
+                }
             }
         }
         for button in current_screen.screen_rows.buttons[cursor_y].clone() {

@@ -9,7 +9,7 @@ use crate::screen::{self, ButtonText, PlainText, Screen, Text, TextContent};
 pub struct Board {
     pub pieces: [[Piece; 8]; 8],
     pub selected_piece: Option<(usize, usize)>,
-	pub moving: bool,
+    pub white_move: bool,
 }
 
 impl Board {
@@ -19,7 +19,7 @@ impl Board {
                 "rnbqkbnr/pppppppp/7P/knbqrbp1/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
-			moving: false,
+            white_move: true,
         }
     }
 
@@ -77,17 +77,7 @@ impl Board {
 					file_index*2,
 					rank_index,
 					None,
-					/* if refresh {None} else {
-						Some("click_piece")
-					} */
-				));/* ::new(
-                    piece_text,
-                    screen.width,
-                    screen.height,
-                    screen::InsertHorizontalPosition::Exact(file_index * 2),
-                    screen::InsertVerticalPosition::Exact(rank_index),
-                    "click_piece",
-                ))); */
+				));
             }
         }
 
@@ -117,6 +107,15 @@ impl Board {
                 .to_string()
         };
         (piece, piece_text)
+    }
+
+    pub fn query_board_with_color(&self, rank:usize,file:usize) -> Option<Piece> {
+        let piece = self.query_board(rank, file).0;
+        if piece.white == self.white_move {
+            return Some(piece);
+        }
+        return None;
+
     }
 
     pub fn closest_tile_left(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
@@ -560,7 +559,7 @@ impl Board {
         filtered_moves
     }
 
-    pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize/* , screen: &mut Screen */) {
+    pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize) {
         let possible_moves = self.filter_possible_moves(piece);
         if possible_moves.contains(&(new_rank, new_file)) {
             let old_rank = piece.rank;
@@ -578,8 +577,7 @@ impl Board {
                 file: old_file,
                 white: true,
             };
-			self.moving = false;
-			// self.display_board(screen);
+            self.white_move = !self.white_move;
         }
     }
 }
