@@ -48,6 +48,10 @@ impl Render {
         self.cursor_controller.move_cursor(direction);
     }
 
+    pub fn move_cursor_half(&mut self, direction: KeyCode) {
+        self.cursor_controller.move_cursor_half(direction);
+    }
+
     pub fn move_cursor_far(&mut self, direction: KeyCode) {
         self.cursor_controller.move_cursor_far(direction);
     }
@@ -68,7 +72,10 @@ impl Render {
 
                 let piece = board.query_board(cursor_y, cursor_x / 2).0;
 
-                if piece.symbol != ChessPieces::None && piece.white != board.white_move && !board.moving {
+                if piece.symbol != ChessPieces::None
+                    && piece.white != board.white_move
+                    && !board.moving
+                {
                     return;
                 }
 
@@ -77,7 +84,7 @@ impl Render {
                     let selected_piece = board
                         .query_board(selected_piece_coords.0, selected_piece_coords.1)
                         .0;
-                    board.move_piece(selected_piece, cursor_y, cursor_x / 2);
+                    let did_win = board.move_piece(selected_piece, cursor_y, cursor_x / 2);
 
                     let board_rows = board.display_board(true);
 
@@ -86,6 +93,31 @@ impl Render {
                             current_screen.screen_rows.edit_single_row(piece);
                         }
                     }
+
+                    if did_win {
+                        /* self.screens[2]
+                        .screen_rows
+                        .edit_single_row(Text::Plain(PlainText::new(
+                            format!(
+                                "Congratulations, {} won!",
+                                if board.white_move { "white" } else { "black" }
+                            ),
+                            self.width,
+                            self.height,
+                            InsertHorizontalPosition::Center,
+                            InsertVerticalPosition::Center,
+                        ))); */
+                        current_screen.game = Some(Board::new());
+                        let board_rows = current_screen.game.unwrap().display_board(true);
+
+                        for row in board_rows {
+                            for piece in row {
+                                current_screen.screen_rows.edit_single_row(piece);
+                            }
+                        }
+                        self.current_screen += 1;
+                    }
+
                     return;
                 }
 
@@ -112,8 +144,9 @@ impl Render {
                     self.current_screen += 1;
                 } else if button.on_click == "last_screen" {
                     self.current_screen -= 1;
-                }
-                else {
+                } else if button.on_click == "reset_game" {
+                    self.current_screen = 0;
+                } else {
                     let on_click = current_screen
                         .button_map
                         .get_key_value(button.on_click)
@@ -213,19 +246,37 @@ impl CursorController {
         }
     }
 
+    pub fn move_cursor_half(&mut self, direction: KeyCode) {
+        match direction {
+            KeyCode::Up => {
+                self.cursor_y = self.height / 2;
+            }
+            KeyCode::Down => {
+                self.cursor_y = self.height / 2;
+            }
+            KeyCode::Left => {
+                self.cursor_x = self.width / 2;
+            }
+            KeyCode::Right => {
+                self.cursor_x = self.width / 2;
+            }
+            _ => unimplemented!(),
+        }
+    }
+
     pub fn move_cursor_far(&mut self, direction: KeyCode) {
         match direction {
             KeyCode::Up => {
                 self.cursor_y = 0;
             }
             KeyCode::Down => {
-                self.cursor_y = self.height-1;
+                self.cursor_y = self.height - 1;
             }
             KeyCode::Left => {
                 self.cursor_x = 0;
             }
             KeyCode::Right => {
-                self.cursor_x = self.width-1;
+                self.cursor_x = self.width - 1;
             }
             _ => unimplemented!(),
         }

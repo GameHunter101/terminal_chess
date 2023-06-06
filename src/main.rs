@@ -86,6 +86,35 @@ r#" _______                       __               __      ______ __
         )));
 
     renderer.new_screen(game_screen);
+
+    let mut victory_button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
+
+    let mut victory_screen = Screen::new(victory_button_map, None);
+
+    victory_screen.screen_rows.edit_multiple_rows(
+        &vec![
+            Text::Plain(PlainText::new(
+                "Congratulations, you won!".to_string(),
+                width,
+                height,
+                InsertHorizontalPosition::Center,
+                InsertVerticalPosition::Center,
+            )),
+            Text::Button(ButtonText::new(
+                "Reset".to_string(),
+                width,
+                height,
+                InsertHorizontalPosition::Center,
+                InsertVerticalPosition::Center,
+                "reset_game",
+            )),
+        ],
+        1,
+        InsertVerticalPosition::Center,
+    );
+
+    renderer.new_screen(victory_screen);
+
     let mut terminal = terminal_management::Terminal::new(renderer);
 
     terminal::enable_raw_mode().expect("Could not turn on raw mode");

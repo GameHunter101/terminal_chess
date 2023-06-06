@@ -156,7 +156,7 @@ impl ScreenRows {
         vertical_position: InsertVerticalPosition,
     ) {
         let plain_text_height = text.len();
-        let full_text_height = plain_text_height + (plain_text_height - 1);
+        let full_text_height = plain_text_height + (row_spacing.saturating_sub(1));
         let start_vertical_position = match vertical_position {
             InsertVerticalPosition::Exact(pos) => pos,
             InsertVerticalPosition::Center => (self.height - full_text_height) / 2,
@@ -170,7 +170,7 @@ impl ScreenRows {
             let text_object = Text::new(
                 line_text,
                 line.position_x(),
-                line.position_y(),
+                row_number,
                 match line {
                     Text::Plain(_) => None,
                     Text::Button(button) => Some(button.on_click),

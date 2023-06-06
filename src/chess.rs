@@ -17,7 +17,7 @@ impl Board {
     pub fn new() -> Self {
         Self {
             pieces: Board::from_fen(
-                "rnbqkbnr/pppppppp/7P/knbqrbp1/7r/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             ),
             selected_piece: None,
             white_move: true,
@@ -554,9 +554,10 @@ impl Board {
         filtered_moves
     }
 
-    pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize) {
+    pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize) -> bool {
         let possible_moves = self.filter_possible_moves(piece);
         if possible_moves.contains(&(new_rank, new_file)) {
+            let piece_at_position = self.query_board(new_rank, new_file).0;
             let old_rank = piece.rank;
             let old_file = piece.file;
             let moved_piece = Piece {
@@ -573,8 +574,10 @@ impl Board {
                 white: true,
             };
             self.white_move = !self.white_move;
+            return piece_at_position.symbol == ChessPieces::King;
         }
         self.moving = false;
+        return false;
     }
 }
 
