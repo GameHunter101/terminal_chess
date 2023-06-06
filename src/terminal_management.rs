@@ -41,6 +41,12 @@ impl Terminal {
                 ..
             } => self.render.move_cursor(direction),
             KeyEvent {
+                code: direction @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                ..
+            } => self.render.move_cursor_far(direction),
+            KeyEvent {
                 code: KeyCode::Enter,
                 kind: KeyEventKind::Press,
                 ..

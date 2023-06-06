@@ -8,7 +8,9 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use crossterm::style::Stylize;
 use crossterm::terminal;
 use render::Render;
-use screen::{ButtonText, PlainText, Screen, Text};
+use screen::{
+    ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, Text,
+};
 
 mod chess;
 mod render;
@@ -21,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let height = height as usize;
     let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
     let mut initial_screen = Screen::new(button_map, None);
-    /* initial_screen.screen_rows.edit_multiple_rows(
+    initial_screen.screen_rows.edit_multiple_rows(
         &PlainText::from_multi_lines(
 r#" _______                       __               __      ______ __                      
 |_     _|.-----.----.--------.|__|.-----.---.-.|  |    |      |  |--.-----.-----.-----.
@@ -33,17 +35,27 @@ r#" _______                       __               __      ______ __
         ),
         0,
         screen::InsertVerticalPosition::Exact(3),
-    ); */
+    );
 
     initial_screen
         .screen_rows
         .edit_single_row(Text::Button(ButtonText::new(
-            "Play Game".to_string(),
+            "Play Game".red().slow_blink().to_string(),
             width,
             height,
-            screen::InsertHorizontalPosition::Center,
-            screen::InsertVerticalPosition::Exact(10),
+            InsertHorizontalPosition::Center,
+            InsertVerticalPosition::Exact(10),
             "next_screen",
+        )));
+
+    initial_screen
+        .screen_rows
+        .edit_single_row(Text::Plain(PlainText::new(
+            "Created by Lior Carmeli for APCSP".dark_red().to_string(),
+            width,
+            height,
+            InsertHorizontalPosition::Center,
+            InsertVerticalPosition::Exact(12),
         )));
 
     let mut renderer = render::Render::new(initial_screen)?;
@@ -56,11 +68,11 @@ r#" _______                       __               __      ______ __
 
     let board_rows = chess_game.display_board(false);
 
-	for row in board_rows {
-            for piece in row {
-                game_screen.screen_rows.edit_single_row(piece);
-            }
-	}
+    for row in board_rows {
+        for piece in row {
+            game_screen.screen_rows.edit_single_row(piece);
+        }
+    }
 
     game_screen
         .screen_rows
@@ -68,15 +80,13 @@ r#" _______                       __               __      ______ __
             "Other Screen".to_string(),
             width,
             height,
-            screen::InsertHorizontalPosition::Right,
-            screen::InsertVerticalPosition::Center,
+            InsertHorizontalPosition::Right,
+            InsertVerticalPosition::Center,
             "last_screen",
         )));
+
     renderer.new_screen(game_screen);
     let mut terminal = terminal_management::Terminal::new(renderer);
-
-    // TODO:
-    // Find a way to set foreground and background color for each text
 
     terminal::enable_raw_mode().expect("Could not turn on raw mode");
     while terminal.run().unwrap() {}

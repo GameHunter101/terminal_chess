@@ -10,6 +10,7 @@ pub struct Board {
     pub pieces: [[Piece; 8]; 8],
     pub selected_piece: Option<(usize, usize)>,
     pub white_move: bool,
+    pub moving: bool,
 }
 
 impl Board {
@@ -20,6 +21,7 @@ impl Board {
             ),
             selected_piece: None,
             white_move: true,
+            moving: false,
         }
     }
 
@@ -73,21 +75,15 @@ impl Board {
                 };
 
                 board_rows[rank_index].push(Text::new(
-					piece_text,
-					file_index*2,
-					rank_index,
-					None,
-				));
+                    piece_text,
+                    file_index * 2,
+                    rank_index,
+                    None,
+                ));
             }
         }
 
-		board_rows
-
-        /* for row in board_rows {
-            for piece in row {
-                screen.screen_rows.edit_single_row(piece);
-            }
-        } */
+        board_rows
     }
 
     pub fn set_selected(&mut self, rank: usize, file: usize) -> Self {
@@ -109,13 +105,12 @@ impl Board {
         (piece, piece_text)
     }
 
-    pub fn query_board_with_color(&self, rank:usize,file:usize) -> Option<Piece> {
+    pub fn query_board_with_color(&self, rank: usize, file: usize) -> Option<Piece> {
         let piece = self.query_board(rank, file).0;
         if piece.white == self.white_move {
             return Some(piece);
         }
         return None;
-
     }
 
     pub fn closest_tile_left(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
@@ -564,12 +559,12 @@ impl Board {
         if possible_moves.contains(&(new_rank, new_file)) {
             let old_rank = piece.rank;
             let old_file = piece.file;
-			let moved_piece = Piece {
-				symbol: piece.symbol,
-				rank: new_rank,
-				file: new_file,
-				white: piece.white,
-			};
+            let moved_piece = Piece {
+                symbol: piece.symbol,
+                rank: new_rank,
+                file: new_file,
+                white: piece.white,
+            };
             self.pieces[new_rank][new_file] = moved_piece;
             self.pieces[old_rank][old_file] = Piece {
                 symbol: ChessPieces::None,
@@ -579,6 +574,7 @@ impl Board {
             };
             self.white_move = !self.white_move;
         }
+        self.moving = false;
     }
 }
 
