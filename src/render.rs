@@ -1,16 +1,10 @@
-use std::collections::HashMap;
-use std::io::{self, stdout, Write};
+use std::io::{stdout, Write};
 
-use crossterm::style::{Color, Stylize};
+use crossterm::style::Stylize;
 use crossterm::{cursor, event::KeyCode, execute, queue, terminal};
-use rand::Rng;
-use regex::Regex;
 
 use crate::chess::{Board, ChessPieces};
-use crate::screen::{
-    ButtonText, InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, ScreenRows,
-    Text, TextContent,
-};
+use crate::screen::{InsertHorizontalPosition, InsertVerticalPosition, PlainText, Screen, Text};
 
 pub struct Render {
     pub screens: Vec<Screen>,
@@ -25,14 +19,14 @@ impl Render {
         let (term_width, term_height) = terminal::size().unwrap();
         let width = term_width as usize;
         let height = term_height as usize;
-        if width < 10 && height < 10 {
+        if width < 90 && height < 12 {
             return Err(RenderError::TerminalSizeError(
                 "Terminal size is too small!",
             ));
         }
         Ok(Self {
             screens: vec![screen],
-            current_screen: 1,
+            current_screen: 0,
             width,
             height,
             cursor_controller: CursorController::new(width, height),
@@ -44,6 +38,7 @@ impl Render {
         execute!(stdout(), cursor::MoveTo(0, 0))
     }
 
+    // Easier access to cursor functions
     pub fn move_cursor(&mut self, direction: KeyCode) {
         self.cursor_controller.move_cursor(direction);
     }
@@ -56,13 +51,14 @@ impl Render {
         self.cursor_controller.move_cursor_far(direction);
     }
 
+    // Code to press for each button press, mostly based on button IDs
     pub fn press_button(&mut self) {
         let cursor_x = self.cursor_controller.cursor_x;
         let cursor_y = self.cursor_controller.cursor_y;
         let current_screen = &mut self.screens[self.current_screen];
         if let Some(board) = &mut current_screen.game {
             if cursor_x < 16 && cursor_y < 8 {
-                let board_rows = board.display_board(true);
+                let board_rows = board.display_board();
 
                 for row in board_rows {
                     for piece in row {
@@ -86,7 +82,7 @@ impl Render {
                         .0;
                     let did_win = board.move_piece(selected_piece, cursor_y, cursor_x / 2);
 
-                    let board_rows = board.display_board(true);
+                    let board_rows = board.display_board();
 
                     for row in board_rows {
                         for piece in row {
@@ -95,20 +91,8 @@ impl Render {
                     }
 
                     if did_win {
-                        /* self.screens[2]
-                        .screen_rows
-                        .edit_single_row(Text::Plain(PlainText::new(
-                            format!(
-                                "Congratulations, {} won!",
-                                if board.white_move { "white" } else { "black" }
-                            ),
-                            self.width,
-                            self.height,
-                            InsertHorizontalPosition::Center,
-                            InsertVerticalPosition::Center,
-                        ))); */
                         current_screen.game = Some(Board::new());
-                        let board_rows = current_screen.game.unwrap().display_board(true);
+                        let board_rows = current_screen.game.unwrap().display_board();
 
                         for row in board_rows {
                             for piece in row {
@@ -136,6 +120,20 @@ impl Render {
                 board.moving = true;
 
                 board.set_selected(cursor_y, cursor_x / 2);
+
+                current_screen
+                    .screen_rows
+                    .clear_row(InsertVerticalPosition::Exact(10));
+
+                current_screen
+                    .screen_rows
+                    .edit_single_row(Text::Plain(PlainText::new(
+                        format!("{}'s turn", if board.white_move { "White" } else { "Red" }),
+                        self.width,
+                        self.height,
+                        InsertHorizontalPosition::Exact(0),
+                        InsertVerticalPosition::Exact(10),
+                    )));
             }
         }
         for button in current_screen.screen_rows.buttons[cursor_y].clone() {
@@ -158,6 +156,7 @@ impl Render {
         }
     }
 
+    // Re-renders the full screen by compiling the rows into a string and flushing it
     pub fn refresh_screen(&mut self) -> crossterm::Result<()> {
         queue!(
             self.screens[self.current_screen],
@@ -179,15 +178,10 @@ impl Render {
     pub fn new_screen(&mut self, screen: Screen) {
         self.screens.push(screen);
     }
-
-    pub fn set_screen(&mut self, screen_index: usize) {
-        self.current_screen = screen_index;
-    }
 }
 
 #[derive(Debug)]
 pub enum RenderError {
-    AddTextError(&'static str),
     TerminalSizeError(&'static str),
 }
 
@@ -220,6 +214,7 @@ impl CursorController {
         }
     }
 
+    // Register arrow keys as cursor movement
     pub fn move_cursor(&mut self, direction: KeyCode) {
         match direction {
             KeyCode::Up => {

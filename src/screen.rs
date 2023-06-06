@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::io::{self, stdout, Write};
 
 use crate::chess::Board;
-use crate::Render;
 
-use crossterm::style::Stylize;
 use crossterm::{queue, terminal};
 use regex::Regex;
 
@@ -20,8 +18,7 @@ pub struct Screen {
 impl Screen {
     pub fn new(button_map: HashMap<&'static str, Box<dyn Fn()>>, board: Option<Board>) -> Self {
         let (term_width, term_height) = terminal::size().unwrap();
-        /* let mut button_map: HashMap<&str, Box<dyn Fn()>> = HashMap::new();
-        button_map.insert("next_screen", Box::new(||{render.set_screen(1)})); */
+
         Self {
             content: String::new(),
             screen_rows: ScreenRows::new(term_width as usize, term_height as usize),
@@ -32,24 +29,19 @@ impl Screen {
         }
     }
 
-    pub fn push(&mut self, ch: char) {
-        self.content.push(ch)
-    }
-
     pub fn push_str(&mut self, string: &str) {
         self.content.push_str(string)
     }
 
+    // Prints out the final screen
     pub fn compile_screen(&mut self) {
-        // self.content.clear();
         let rows = self.screen_rows.rows.clone();
         for row in rows {
-            // println!("Row: {}",row);
             self.push_str(&row.join(""));
 
             queue!(self, terminal::Clear(terminal::ClearType::UntilNewLine)).unwrap();
         }
-        stdout().flush();
+        stdout().flush().unwrap();
     }
 }
 
@@ -64,7 +56,6 @@ impl io::Write for Screen {
         }
     }
     fn flush(&mut self) -> io::Result<()> {
-        // self.rows_to_string();
         let out = write!(stdout(), "{}", self.content);
         stdout().flush()?;
         self.content.clear();
@@ -75,7 +66,7 @@ impl io::Write for Screen {
 pub struct ScreenRows {
     pub rows: Vec<Vec<String>>,
     pub buttons: Vec<Vec<ButtonText>>,
-    width: usize,
+    _width: usize,
     height: usize,
 }
 
@@ -84,7 +75,7 @@ impl ScreenRows {
         Self {
             rows: vec![vec![" ".to_string(); width]; height],
             buttons: vec![Vec::new(); height],
-            width,
+            _width: width,
             height,
         }
     }
@@ -125,6 +116,7 @@ impl ScreenRows {
         }
     }
 
+    // Modify the contents of a single row (WARNING: WILL GET MESSY IF THERE IS ANSI STUFF BEFORE INSERTED STRINGS)
     pub fn edit_single_row(&mut self, text: Text) {
         let text_len = text.length();
 
@@ -140,15 +132,17 @@ impl ScreenRows {
         };
     }
 
+    // Clears the content of a given row
     pub fn clear_row(&mut self, row: InsertVerticalPosition) {
         let row_num = match row {
             InsertVerticalPosition::Bottom => self.height - 1,
             InsertVerticalPosition::Center => self.height / 2,
             InsertVerticalPosition::Exact(num) => num,
         };
-        self.rows[row_num] = vec![" ".to_string(); self.width];
+        self.rows[row_num] = vec![" ".to_string(); self._width];
     }
 
+    // Bulk edit rows, can specify the gap between rows and its vertical position
     pub fn edit_multiple_rows(
         &mut self,
         text: &[Text],
@@ -182,12 +176,15 @@ impl ScreenRows {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum InsertHorizontalPosition {
     Exact(usize),
     Center,
     Right,
 }
 
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum InsertVerticalPosition {
     Exact(usize),
     Center,
@@ -201,6 +198,7 @@ pub enum Text {
 }
 
 impl Text {
+    // Make a new text object, returns a button if an on_click is given, otherwise returns a plan text
     pub fn new(
         text: String,
         position_x: usize,
@@ -300,10 +298,10 @@ impl PlainText {
         }
     }
 
+    // Convert a string with multiple lines into a vector of multiple text objects, one for each line
     pub fn from_multi_lines(
         text: String,
         screen_width: usize,
-        screen_height: usize,
         horizontal_position: InsertHorizontalPosition,
     ) -> Vec<Text> {
         text.split("\n")

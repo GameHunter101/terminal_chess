@@ -1,15 +1,9 @@
-use std::{
-    fmt,
-    io::{self, stdin, stdout, Read, Write},
-    time::Duration,
-};
-
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    queue, terminal,
+    terminal,
 };
 
-use crate::render::{Render, RenderError};
+use crate::render::Render;
 
 pub struct Terminal {
     render: Render,
@@ -19,6 +13,8 @@ impl Terminal {
     pub fn new(renderer: Render) -> Self {
         Self { render: renderer }
     }
+    
+    // Event loop for reading key presses
     fn read_key(&mut self) -> crossterm::Result<KeyEvent> {
         loop {
             if let Event::Key(event) = event::read()? {
@@ -27,6 +23,7 @@ impl Terminal {
         }
     }
 
+    // Read the key presses, call corresponding functions
     fn process_keypress(&mut self) -> crossterm::Result<bool> {
         match self.read_key().unwrap() {
             KeyEvent {

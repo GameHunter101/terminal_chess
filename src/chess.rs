@@ -1,9 +1,6 @@
-use std::ops::Add;
-
 use crossterm::style::Stylize;
-use crossterm::terminal;
 
-use crate::screen::{self, ButtonText, PlainText, Screen, Text, TextContent};
+use crate::screen::Text;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Board {
@@ -16,9 +13,7 @@ pub struct Board {
 impl Board {
     pub fn new() -> Self {
         Self {
-            pieces: Board::from_fen(
-                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-            ),
+            pieces: Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
             selected_piece: None,
             white_move: true,
             moving: false,
@@ -59,7 +54,8 @@ impl Board {
         final_board
     }
 
-    pub fn display_board(&self, refresh: bool) -> Vec<Vec<Text>> {
+    // Returns the baord as a 2d vector of Text objects
+    pub fn display_board(&self) -> Vec<Vec<Text>> {
         let mut board_rows: Vec<Vec<Text>> = vec![vec![]; 8];
 
         for (rank_index, rank) in self.pieces.iter().enumerate() {
@@ -86,11 +82,13 @@ impl Board {
         board_rows
     }
 
+    // Sets the selected piece for use in piece movement
     pub fn set_selected(&mut self, rank: usize, file: usize) -> Self {
         self.selected_piece = Some((rank, file));
         *self
     }
 
+    // Returns the piece at the given position and its printable text, including ANSI sequences
     pub fn query_board(&self, rank: usize, file: usize) -> (Piece, String) {
         let piece = self.pieces[rank][file];
         let piece_checker = (rank + file) % 2;
@@ -105,19 +103,17 @@ impl Board {
         (piece, piece_text)
     }
 
-    pub fn query_board_with_color(&self, rank: usize, file: usize) -> Option<Piece> {
-        let piece = self.query_board(rank, file).0;
-        if piece.white == self.white_move {
-            return Some(piece);
-        }
-        return None;
-    }
-
-    pub fn closest_tile_left(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+    // Gets the valid positions to the left of a piece
+    pub fn valid_positions_left(
+        &self,
+        rank: usize,
+        file: usize,
+        white: bool,
+    ) -> Vec<(usize, usize)> {
         let mut left_moves = vec![];
         let piece_rank = self.pieces[rank];
 
-        let mut whole_rank_left = &mut piece_rank.clone()[..file];
+        let whole_rank_left = &mut piece_rank.clone()[..file];
         whole_rank_left.reverse();
         let mut dist_left = whole_rank_left.len();
         for (dist, piece) in whole_rank_left.iter().enumerate() {
@@ -140,11 +136,17 @@ impl Board {
         left_moves
     }
 
-    pub fn closest_tile_right(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+    // Gets the valid positions to the right of a piece
+    pub fn valid_positions_right(
+        &self,
+        rank: usize,
+        file: usize,
+        white: bool,
+    ) -> Vec<(usize, usize)> {
         let mut right_moves = vec![];
         let piece_rank = self.pieces[rank];
 
-        let mut whole_rank_right = &mut piece_rank.clone()[file + 1..];
+        let whole_rank_right = &mut piece_rank.clone()[file + 1..];
         let mut dist_right = whole_rank_right.len();
         for (dist, piece) in whole_rank_right.iter().enumerate() {
             if piece.symbol != ChessPieces::None {
@@ -166,11 +168,13 @@ impl Board {
 
         right_moves
     }
-    pub fn closest_tile_up(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+
+    // Gets the valid positions above the piece
+    pub fn valid_positions_up(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
         let mut up_moves = vec![];
         let piece_file = self.pieces.map(|rank| rank[file]);
 
-        let mut whole_file_up = &mut piece_file.clone()[..rank];
+        let whole_file_up = &mut piece_file.clone()[..rank];
         whole_file_up.reverse();
         let mut dist_up = whole_file_up.len();
         for (dist, piece) in whole_file_up.iter().enumerate() {
@@ -194,11 +198,17 @@ impl Board {
         up_moves
     }
 
-    pub fn closest_tile_down(&self, rank: usize, file: usize, white: bool) -> Vec<(usize, usize)> {
+    // Gets the valid positions below the piece
+    pub fn valid_positions_down(
+        &self,
+        rank: usize,
+        file: usize,
+        white: bool,
+    ) -> Vec<(usize, usize)> {
         let mut down_moves = vec![];
         let piece_file = self.pieces.map(|rank| rank[file]);
 
-        let mut whole_file_down = &mut piece_file.clone()[rank + 1..];
+        let whole_file_down = &mut piece_file.clone()[rank + 1..];
         let mut dist_down = whole_file_down.len();
         for (dist, piece) in whole_file_down.iter().enumerate() {
             if piece.symbol != ChessPieces::None {
@@ -221,7 +231,8 @@ impl Board {
         down_moves
     }
 
-    pub fn piece_moves_diagonal_positive(
+    // Gets the valid positions in a y=x line going through the piece
+    pub fn valid_positions_diagonal_positive(
         &self,
         rank: usize,
         file: usize,
@@ -230,7 +241,7 @@ impl Board {
         let mut moves = vec![];
         let mut diagonal_top: Vec<(usize, usize)> = vec![];
         let mut diagonal_bottom: Vec<(usize, usize)> = vec![];
-        for (i, full_rank) in self.pieces.iter().enumerate() {
+        for (i, _) in self.pieces.iter().enumerate() {
             let offset = rank as i32 - i as i32;
             let diagonal_file = file as i32 + offset;
             if diagonal_file >= 0 && diagonal_file < 8 {
@@ -268,6 +279,8 @@ impl Board {
         }
         moves
     }
+
+    // Gets the valid pieces in a y=-x line going through the piece
     pub fn piece_moves_diagonal_negative(
         &self,
         rank: usize,
@@ -279,7 +292,7 @@ impl Board {
         let mut diagonal_bottom: Vec<(usize, usize)> = vec![];
 
         let offset = (file as i32 - 3) + (3 - rank as i32);
-        for (i, full_rank) in self.pieces.iter().enumerate() {
+        for (i, _) in self.pieces.iter().enumerate() {
             let tile_file = i as i32 + offset;
             let tile_rank = i;
             if tile_file >= 0 && tile_file < 8 {
@@ -320,6 +333,7 @@ impl Board {
         moves
     }
 
+    // Calculates all possible moves for any given piece, returns a vector of coordinates
     pub fn possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
         match origin_piece.symbol {
             ChessPieces::Pawn => {
@@ -404,19 +418,22 @@ impl Board {
             ChessPieces::Rook => {
                 let mut moves = vec![];
 
-                let mut left_moves = self.closest_tile_left(
+                let mut left_moves = self.valid_positions_left(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
                 );
-                let mut right_moves = self.closest_tile_right(
+                let mut right_moves = self.valid_positions_right(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
                 );
-                let mut up_moves =
-                    self.closest_tile_up(origin_piece.rank, origin_piece.file, origin_piece.white);
-                let mut down_moves = self.closest_tile_down(
+                let mut up_moves = self.valid_positions_up(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut down_moves = self.valid_positions_down(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
@@ -455,7 +472,7 @@ impl Board {
             ChessPieces::Bishop => {
                 let mut moves = vec![];
 
-                let mut moves_positive_diag = self.piece_moves_diagonal_positive(
+                let mut moves_positive_diag = self.valid_positions_diagonal_positive(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
@@ -474,19 +491,22 @@ impl Board {
             ChessPieces::Queen => {
                 let mut moves = vec![];
 
-                let mut left_moves = self.closest_tile_left(
+                let mut left_moves = self.valid_positions_left(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
                 );
-                let mut right_moves = self.closest_tile_right(
+                let mut right_moves = self.valid_positions_right(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
                 );
-                let mut up_moves =
-                    self.closest_tile_up(origin_piece.rank, origin_piece.file, origin_piece.white);
-                let mut down_moves = self.closest_tile_down(
+                let mut up_moves = self.valid_positions_up(
+                    origin_piece.rank,
+                    origin_piece.file,
+                    origin_piece.white,
+                );
+                let mut down_moves = self.valid_positions_down(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
@@ -497,7 +517,7 @@ impl Board {
                 moves.append(&mut up_moves);
                 moves.append(&mut down_moves);
 
-                let mut moves_positive_diag = self.piece_moves_diagonal_positive(
+                let mut moves_positive_diag = self.valid_positions_diagonal_positive(
                     origin_piece.rank,
                     origin_piece.file,
                     origin_piece.white,
@@ -542,6 +562,7 @@ impl Board {
         }
     }
 
+    // Filters down the possible moves so that they don't include your own pieces
     pub fn filter_possible_moves(&self, origin_piece: Piece) -> Vec<(usize, usize)> {
         let mut filtered_moves = vec![];
         let possible_moves = self.possible_moves(origin_piece);
@@ -554,6 +575,7 @@ impl Board {
         filtered_moves
     }
 
+    // Moves a given piece from its original location to (new_rank, new_file), returns whether or not the piece captured a king
     pub fn move_piece(&mut self, piece: Piece, new_rank: usize, new_file: usize) -> bool {
         let possible_moves = self.filter_possible_moves(piece);
         if possible_moves.contains(&(new_rank, new_file)) {
@@ -599,6 +621,7 @@ impl Piece {
         }
     }
 
+    // Returns the text symbol for the piece, including ANSI sequences
     pub fn get_symbol(&self) -> String {
         let symbol = self.symbol.to_symbol();
         match self.white {
@@ -626,6 +649,7 @@ pub enum ChessPieces {
 }
 
 impl ChessPieces {
+    // Converts a FEN character into a useable piece type
     fn from_fen(piece: char) -> Self {
         match piece {
             // White pieces
@@ -646,6 +670,7 @@ impl ChessPieces {
         }
     }
 
+    // Returns the ASCII character for each piece
     fn to_symbol(&self) -> String {
         let symbol = match self {
             ChessPieces::None => "_",
